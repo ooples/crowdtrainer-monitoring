@@ -1,0 +1,141 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Production builds
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+.grunt
+
+# Coverage and test results
+coverage/
+.nyc_output/
+.coverage/
+*.lcov
+junit.xml
+test-results/
+playwright-report/
+test-results.xml
+
+# TypeScript
+*.tsbuildinfo
+.tsbuildinfo
+
+# Cache directories
+.npm
+.eslintcache
+.cache/
+.parcel-cache/
+.turbo/
+.swc/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env.development
+.env.production
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Package manager lock files (keep only pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Documentation build
+docs/
+typedoc/
+
+# Monitoring and metrics
+metrics/
+traces/
+profiles/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Platform specific
+.vercel
+.netlify
+
+# Sentry
+.sentryclirc
+
+# Storybook
+storybook-static/
+
+# Rush
+common/temp/

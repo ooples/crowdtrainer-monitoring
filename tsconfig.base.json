@@ -1,0 +1,103 @@
+{
+  "compilerOptions": {
+    // Language and Environment
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    
+    // Type Checking
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+    
+    // Modules
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    
+    // Emit
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "importHelpers": true,
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    
+    // Interop Constraints
+    "skipLibCheck": true,
+    
+    // Path mapping for monorepo
+    "baseUrl": ".",
+    "paths": {
+      "@monitoring-service/core": ["./packages/core/src"],
+      "@monitoring-service/core/*": ["./packages/core/src/*"],
+      "@monitoring-service/server": ["./packages/server/src"],
+      "@monitoring-service/server/*": ["./packages/server/src/*"],
+      "@monitoring-service/dashboard": ["./packages/dashboard/src"],
+      "@monitoring-service/dashboard/*": ["./packages/dashboard/src/*"],
+      "@monitoring-service/sdk-js": ["./packages/sdk-js/src"],
+      "@monitoring-service/sdk-js/*": ["./packages/sdk-js/src/*"],
+      "@monitoring-service/sdk-react": ["./packages/sdk-react/src"],
+      "@monitoring-service/sdk-react/*": ["./packages/sdk-react/src/*"],
+      "@monitoring-service/sdk-react-native": ["./packages/sdk-react-native/src"],
+      "@monitoring-service/sdk-react-native/*": ["./packages/sdk-react-native/src/*"]
+    },
+    
+    // Additional options for better development experience
+    "incremental": true,
+    "composite": true,
+    "tsBuildInfoFile": ".tsbuildinfo"
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "packages/*/tests/**/*",
+    "packages/*/*.ts",
+    "packages/*/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.stories.ts",
+    "**/*.stories.tsx"
+  ],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/server"
+    },
+    {
+      "path": "./packages/dashboard"
+    },
+    {
+      "path": "./packages/sdk-js"
+    },
+    {
+      "path": "./packages/sdk-react"
+    },
+    {
+      "path": "./packages/sdk-react-native"
+    }
+  ]
+}

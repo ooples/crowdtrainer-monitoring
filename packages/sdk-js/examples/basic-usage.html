@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring SDK - Basic Usage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .error-btn {
+            background: #dc3545;
+        }
+        .error-btn:hover {
+            background: #c82333;
+        }
+        .info {
+            background: #f8f9fa;
+            border-left: 4px solid #007cba;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>Monitoring SDK - Basic Usage Demo</h1>
+    
+    <div class="info">
+        <p><strong>Note:</strong> This demo shows how to use the Monitoring SDK. Open your browser's developer console to see debug logs and check the Network tab to see events being sent.</p>
+    </div>
+
+    <div id="status" class="status warning">SDK initializing...</div>
+
+    <div class="demo-section">
+        <h2>User Management</h2>
+        <button onclick="setUser()">Set User</button>
+        <button onclick="clearUser()">Clear User</button>
+        <button onclick="showUser()">Show Current User</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Custom Context</h2>
+        <button onclick="setContext()">Set Context</button>
+        <button onclick="clearContext()">Clear Context</button>
+        <button onclick="showContext()">Show Context</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Event Tracking</h2>
+        <button onclick="trackCustomEvent()">Track Custom Event</button>
+        <button onclick="trackPageView()">Track Page View</button>
+        <button onclick="trackInteraction('button', 'click')">Track Button Click</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Breadcrumbs</h2>
+        <button onclick="addBreadcrumb()">Add Breadcrumb</button>
+        <button onclick="showBreadcrumbs()">Show Breadcrumbs</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Error Testing</h2>
+        <button class="error-btn" onclick="triggerError()">Trigger JavaScript Error</button>
+        <button class="error-btn" onclick="triggerPromiseRejection()">Trigger Promise Rejection</button>
+        <button class="error-btn" onclick="triggerNetworkError()">Trigger Network Error</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Network Testing</h2>
+        <button onclick="makeSuccessfulRequest()">Successful Request</button>
+        <button onclick="makeSlowRequest()">Slow Request</button>
+        <button onclick="makeBulkRequests()">Bulk Requests</button>
+    </div>
+
+    <div class="demo-section">
+        <h2>Manual Controls</h2>
+        <button onclick="flushEvents()">Flush Events</button>
+        <button onclick="showSession()">Show Session</button>
+        <button onclick="startMonitoring()">Start Monitoring</button>
+        <button onclick="stopMonitoring()">Stop Monitoring</button>
+    </div>
+
+    <!-- Load the SDK -->
+    <script src="../dist/index.umd.js"></script>
+    <script>
+        // Initialize the monitoring SDK
+        const monitor = new MonitoringSDK.Monitor({
+            projectId: 'demo-project',
+            apiUrl: 'https://httpbin.org/post', // Using httpbin for demo
+            environment: 'demo',
+            debug: true,
+            autoCapture: {
+                errors: true,
+                performance: true,
+                network: true,
+                webVitals: true,
+            },
+            sampleRate: 1.0,
+        });
+
+        // Update status
+        const statusEl = document.getElementById('status');
+        if (monitor.isActive()) {
+            statusEl.textContent = 'SDK initialized and active!';
+            statusEl.className = 'status success';
+        }
+
+        // User management functions
+        function setUser() {
+            monitor.setUser({
+                id: 'demo-user-' + Date.now(),
+                email: 'demo@example.com',
+                name: 'Demo User',
+                properties: {
+                    plan: 'premium',
+                    signupDate: '2023-01-01',
+                }
+            });
+            console.log('User set:', monitor.getUser());
+        }
+
+        function clearUser() {
+            monitor.clearUser();
+            console.log('User cleared');
+        }
+
+        function showUser() {
+            console.log('Current user:', monitor.getUser());
+        }
+
+        // Context functions
+        function setContext() {
+            monitor.setContext('theme', 'dark');
+            monitor.setContext('feature_experiment_a', true);
+            monitor.setContext('app_version', '1.2.3');
+            console.log('Context set:', monitor.getContext());
+        }
+
+        function clearContext() {
+            monitor.clearContext();
+            console.log('Context cleared');
+        }
+
+        function showContext() {
+            console.log('Current context:', monitor.getContext());
+        }
+
+        // Event tracking functions
+        function trackCustomEvent() {
+            monitor.track('demo_button_click', {
+                button_id: 'custom_event_btn',
+                page: '/demo',
+                timestamp: new Date().toISOString(),
+                user_agent: navigator.userAgent,
+            });
+            console.log('Custom event tracked');
+        }
+
+        function trackPageView() {
+            monitor.trackPageView('/demo-page', 'Demo Page');
+            console.log('Page view tracked');
+        }
+
+        function trackInteraction(element, action) {
+            monitor.trackInteraction(element, action, {
+                element_id: 'demo_' + element,
+                page_section: 'demo',
+                x: Math.floor(Math.random() * 100),
+                y: Math.floor(Math.random() * 100),
+            });
+            console.log(`Interaction tracked: ${action} on ${element}`);
+        }
+
+        // Breadcrumb functions
+        function addBreadcrumb() {
+            monitor.addBreadcrumb({
+                timestamp: Date.now(),
+                type: 'info',
+                message: 'Demo breadcrumb added',
+                data: {
+                    action: 'manual_breadcrumb',
+                    demo: true,
+                }
+            });
+            console.log('Breadcrumb added');
+        }
+
+        function showBreadcrumbs() {
+            console.log('Current breadcrumbs:', monitor.getBreadcrumbs());
+        }
+
+        // Error testing functions
+        function triggerError() {
+            // This will trigger a JavaScript error
+            throw new Error('Demo error: This is a test error for monitoring');
+        }
+
+        function triggerPromiseRejection() {
+            // This will trigger an unhandled promise rejection
+            Promise.reject(new Error('Demo promise rejection'));
+        }
+
+        function triggerNetworkError() {
+            // This will trigger a network error
+            fetch('https://nonexistent-domain-for-testing.com/api')
+                .catch(error => console.log('Network error (expected):', error));
+        }
+
+        // Network testing functions
+        function makeSuccessfulRequest() {
+            fetch('https://httpbin.org/get?demo=true')
+                .then(response => response.json())
+                .then(data => console.log('Successful request:', data))
+                .catch(error => console.error('Request failed:', error));
+        }
+
+        function makeSlowRequest() {
+            fetch('https://httpbin.org/delay/3')
+                .then(response => response.json())
+                .then(data => console.log('Slow request completed:', data))
+                .catch(error => console.error('Slow request failed:', error));
+        }
+
+        function makeBulkRequests() {
+            for (let i = 0; i < 5; i++) {
+                fetch(`https://httpbin.org/get?bulk=${i}`)
+                    .then(response => response.json())
+                    .then(data => console.log(`Bulk request ${i} completed`))
+                    .catch(error => console.error(`Bulk request ${i} failed:`, error));
+            }
+        }
+
+        // Manual control functions
+        function flushEvents() {
+            monitor.flush().then(success => {
+                console.log('Events flushed, success:', success);
+                alert(`Events flushed. Success: ${success}`);
+            });
+        }
+
+        function showSession() {
+            console.log('Current session:', monitor.getSession());
+        }
+
+        function startMonitoring() {
+            monitor.start();
+            console.log('Monitoring started, active:', monitor.isActive());
+        }
+
+        function stopMonitoring() {
+            monitor.stop();
+            console.log('Monitoring stopped, active:', monitor.isActive());
+        }
+
+        // Simulate some automatic activity
+        setInterval(() => {
+            if (Math.random() < 0.1) { // 10% chance every 5 seconds
+                monitor.addBreadcrumb({
+                    timestamp: Date.now(),
+                    type: 'info',
+                    message: 'Automatic activity detected',
+                    data: {
+                        activity_type: 'periodic_check',
+                        random_value: Math.random(),
+                    }
+                });
+            }
+        }, 5000);
+
+        // Set initial user for demo
+        setTimeout(() => {
+            setUser();
+            setContext();
+        }, 1000);
+    </script>
+</body>
+</html>

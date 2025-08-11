@@ -1,0 +1,114 @@
+{
+  "name": "@monitoring-service/root",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Enterprise-grade monitoring service monorepo with real-time insights, alerting, and multi-platform SDKs",
+  "keywords": [
+    "monitoring",
+    "observability",
+    "analytics",
+    "telemetry",
+    "real-time",
+    "dashboard",
+    "alerting"
+  ],
+  "homepage": "https://github.com/your-org/monitoring-service#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/monitoring-service/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/monitoring-service.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Your Organization",
+    "email": "contact@yourorg.com",
+    "url": "https://yourorg.com"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm --stream -r build",
+    "build:core": "pnpm --filter @monitoring-service/core build",
+    "build:server": "pnpm --filter @monitoring-service/server build",
+    "build:dashboard": "pnpm --filter @monitoring-service/dashboard build",
+    "build:sdks": "pnpm --filter \"@monitoring-service/sdk-*\" build",
+    "dev": "pnpm --stream -r dev",
+    "dev:core": "pnpm --filter @monitoring-service/core dev",
+    "dev:server": "pnpm --filter @monitoring-service/server dev",
+    "dev:dashboard": "pnpm --filter @monitoring-service/dashboard dev",
+    "clean": "pnpm --stream -r clean && rimraf node_modules dist coverage .turbo",
+    "lint": "pnpm --stream -r lint",
+    "lint:fix": "pnpm --stream -r lint:fix",
+    "type-check": "pnpm --stream -r type-check",
+    "test": "pnpm --stream -r test",
+    "test:unit": "pnpm --stream -r test:unit",
+    "test:integration": "pnpm --stream -r test:integration",
+    "test:e2e": "pnpm --stream -r test:e2e",
+    "test:coverage": "pnpm --stream -r test:coverage",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish",
+    "release": "pnpm build && pnpm changeset:publish",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "deps:check": "pnpm --stream -r deps:check",
+    "deps:update": "pnpm --stream -r deps:update",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "prepare": "husky install",
+    "precommit": "lint-staged",
+    "security:audit": "pnpm audit --audit-level moderate",
+    "security:licenses": "license-checker --summary",
+    "docs:build": "typedoc",
+    "docs:serve": "http-server docs -p 3001",
+    "benchmark": "pnpm --stream -r benchmark"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.4.8",
+    "@changesets/cli": "^2.26.2",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.28.1",
+    "eslint-plugin-prettier": "^5.0.0",
+    "husky": "^8.0.3",
+    "http-server": "^14.1.1",
+    "license-checker": "^25.0.1",
+    "lint-staged": "^14.0.1",
+    "prettier": "^3.0.3",
+    "rimraf": "^5.0.5",
+    "turbo": "^1.10.14",
+    "typedoc": "^0.25.2",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "react": "18"
+      }
+    }
+  }
+}

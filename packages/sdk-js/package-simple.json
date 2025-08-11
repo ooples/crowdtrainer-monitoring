@@ -1,0 +1,26 @@
+{
+  "name": "@monitoring-service/sdk-js",
+  "version": "1.0.0",
+  "description": "JavaScript/TypeScript SDK for monitoring service",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && rollup -c",
+    "build:dev": "tsc && rollup -c --watch",
+    "test": "echo 'Tests would run here'",
+    "lint": "echo 'Linting would run here'",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "monitoring",
+    "analytics",
+    "performance",
+    "error-tracking"
+  ],
+  "author": "Monitoring Service",
+  "license": "MIT"
+}

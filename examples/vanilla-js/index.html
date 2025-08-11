@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vanilla JavaScript Monitoring Example</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body>
+  <!-- Loading indicator -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Initializing monitoring...</p>
+  </div>
+
+  <!-- Main navigation -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <a href="#home" class="brand-link">📊 Vanilla JS Monitor</a>
+      </div>
+      <ul class="nav-menu">
+        <li class="nav-item">
+          <a href="#home" class="nav-link active" data-page="home">Home</a>
+        </li>
+        <li class="nav-item">
+          <a href="#features" class="nav-link" data-page="features">Features</a>
+        </li>
+        <li class="nav-item">
+          <a href="#demo" class="nav-link" data-page="demo">Demo</a>
+        </li>
+        <li class="nav-item">
+          <a href="#analytics" class="nav-link" data-page="analytics">Analytics</a>
+        </li>
+      </ul>
+      <div class="nav-actions">
+        <button id="get-started-btn" class="btn btn-primary">Get Started</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content area -->
+  <main id="main-content">
+    <!-- Home Page -->
+    <section id="home-page" class="page active">
+      <div class="hero">
+        <div class="container">
+          <h1>Vanilla JavaScript Monitoring</h1>
+          <p>Lightweight, dependency-free monitoring integration for any website</p>
+          <div class="hero-stats">
+            <div class="stat">
+              <div class="stat-value" id="page-views">0</div>
+              <div class="stat-label">Page Views</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="events-tracked">0</div>
+              <div class="stat-label">Events Tracked</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="session-time">0s</div>
+              <div class="stat-label">Session Time</div>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button id="track-event-btn" class="btn btn-primary btn-lg">Track Custom Event</button>
+            <button id="simulate-error-btn" class="btn btn-secondary btn-lg">Simulate Error</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <section class="features-overview">
+          <h2>What We Track</h2>
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-icon">👤</div>
+              <h3>User Interactions</h3>
+              <p>Button clicks, form submissions, scroll behavior, and custom events</p>
+              <div class="feature-status" id="interactions-status">✅ Active</div>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">⚡</div>
+              <h3>Performance Metrics</h3>
+              <p>Page load times, API response times, and Core Web Vitals</p>
+              <div class="feature-status" id="performance-status">✅ Active</div>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">🚨</div>
+              <h3>Error Tracking</h3>
+              <p>JavaScript errors, network failures, and custom error reporting</p>
+              <div class="feature-status" id="errors-status">✅ Active</div>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">📊</div>
+              <h3>Custom Analytics</h3>
+              <p>Business metrics, conversion tracking, and custom events</p>
+              <div class="feature-status" id="analytics-status">✅ Active</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Features Page -->
+    <section id="features-page" class="page">
+      <div class="container">
+        <h1>Monitoring Features</h1>
+        <div class="features-detail">
+          <div class="feature-section">
+            <h2>🔧 Easy Integration</h2>
+            <p>Add comprehensive monitoring to any website with just a few lines of code:</p>
+            <pre class="code-block"><code>&lt;script src="https://cdn.crowdtrainer.com/monitoring.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  CrowdTrainerMonitoring.init({
+    apiEndpoint: 'https://api.crowdtrainer.com/monitoring',
+    debug: true
+  });
+&lt;/script&gt;</code></pre>
+          </div>
+
+          <div class="feature-section">
+            <h2>📱 Cross-Platform Support</h2>
+            <ul class="feature-list">
+              <li>✅ Works on all modern browsers</li>
+              <li>✅ Mobile and desktop support</li>
+              <li>✅ Progressive Web App compatible</li>
+              <li>✅ CDN delivery for fast loading</li>
+              <li>✅ Offline event queuing</li>
+            </ul>
+          </div>
+
+          <div class="feature-section">
+            <h2>⚙️ Customizable Tracking</h2>
+            <div class="demo-controls">
+              <button id="track-custom-btn" class="btn btn-primary">Track Custom Event</button>
+              <button id="track-conversion-btn" class="btn btn-success">Track Conversion</button>
+              <button id="track-performance-btn" class="btn btn-info">Track Performance</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Page -->
+    <section id="demo-page" class="page">
+      <div class="container">
+        <h1>Interactive Demo</h1>
+        
+        <div class="demo-grid">
+          <div class="demo-card">
+            <h3>API Call Monitoring</h3>
+            <p>Test API performance tracking with real HTTP requests</p>
+            <button id="api-call-btn" class="btn btn-primary">Make API Call</button>
+            <div id="api-result" class="result-area"></div>
+          </div>
+
+          <div class="demo-card">
+            <h3>Form Tracking</h3>
+            <form id="demo-form" class="demo-form">
+              <div class="form-group">
+                <label for="demo-name">Name:</label>
+                <input type="text" id="demo-name" name="name" placeholder="Enter your name">
+              </div>
+              <div class="form-group">
+                <label for="demo-email">Email:</label>
+                <input type="email" id="demo-email" name="email" placeholder="Enter your email">
+              </div>
+              <div class="form-group">
+                <label for="demo-message">Message:</label>
+                <textarea id="demo-message" name="message" placeholder="Your message..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">Submit Form</button>
+            </form>
+            <div id="form-result" class="result-area"></div>
+          </div>
+
+          <div class="demo-card">
+            <h3>User Interaction Tracking</h3>
+            <div class="interaction-demo">
+              <button id="like-btn" class="btn btn-outline">👍 Like (0)</button>
+              <button id="share-btn" class="btn btn-outline">📤 Share</button>
+              <button id="bookmark-btn" class="btn btn-outline">🔖 Bookmark</button>
+              <button id="download-btn" class="btn btn-outline">⬇️ Download</button>
+            </div>
+          </div>
+
+          <div class="demo-card">
+            <h3>Error Tracking Demo</h3>
+            <p>Test error tracking and reporting</p>
+            <div class="error-demo">
+              <button id="js-error-btn" class="btn btn-warning">Trigger JS Error</button>
+              <button id="network-error-btn" class="btn btn-warning">Network Error</button>
+              <button id="custom-error-btn" class="btn btn-warning">Custom Error</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics Page -->
+    <section id="analytics-page" class="page">
+      <div class="container">
+        <h1>Live Analytics Dashboard</h1>
+        
+        <div class="analytics-header">
+          <div class="connection-status">
+            <span id="connection-indicator" class="status-indicator online">🟢 Connected</span>
+            <span id="events-queued">0 events queued</span>
+          </div>
+          <div class="analytics-actions">
+            <button id="export-data-btn" class="btn btn-secondary">Export Data</button>
+            <button id="clear-session-btn" class="btn btn-outline">Clear Session</button>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="analytics-card">
+            <h3>Session Overview</h3>
+            <div class="session-stats">
+              <div class="session-stat">
+                <span class="stat-label">Duration:</span>
+                <span id="session-duration" class="stat-value">0s</span>
+              </div>
+              <div class="session-stat">
+                <span class="stat-label">Page Views:</span>
+                <span id="total-page-views" class="stat-value">0</span>
+              </div>
+              <div class="session-stat">
+                <span class="stat-label">Events:</span>
+                <span id="total-events" class="stat-value">0</span>
+              </div>
+              <div class="session-stat">
+                <span class="stat-label">Errors:</span>
+                <span id="total-errors" class="stat-value">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Recent Events</h3>
+            <div id="recent-events" class="events-list">
+              <p class="no-events">No events yet. Navigate around to see events appear!</p>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Performance Metrics</h3>
+            <div id="performance-metrics" class="metrics-list">
+              <p class="no-metrics">Performance metrics will appear here...</p>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h3>User Journey</h3>
+            <div id="user-journey" class="journey-list">
+              <p class="no-journey">User journey will be tracked here...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2024 CrowdTrainer Monitoring. Vanilla JavaScript Example.</p>
+      <div class="footer-stats">
+        <span>Monitoring Status: <span id="footer-status" class="status-active">Active</span></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Notification system -->
+  <div id="notifications" class="notifications"></div>
+
+  <!-- Include monitoring library -->
+  <script src="js/monitoring.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

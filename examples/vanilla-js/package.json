@@ -1,0 +1,27 @@
+{
+  "name": "vanilla-js-monitoring-example",
+  "version": "1.0.0",
+  "description": "Vanilla JavaScript integration example for CrowdTrainer monitoring service",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 3000 || python3 -m http.server 3000",
+    "serve": "npx serve .",
+    "lint": "eslint js --ext .js",
+    "format": "prettier --write js/**/*.js *.html *.css"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "serve": "^14.0.0"
+  },
+  "keywords": [
+    "monitoring",
+    "vanilla-js",
+    "javascript",
+    "crowdtrainer",
+    "analytics",
+    "performance"
+  ],
+  "author": "CrowdTrainer Team",
+  "license": "MIT"
+}

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_MONITORING_API_URL=${MONITORING_API_URL:-http://localhost:3001/api}
+      - NEXT_PUBLIC_MONITORING_API_KEY=${MONITORING_API_KEY}
+      - NEXT_PUBLIC_BRAND_NAME=${BRAND_NAME:-Monitoring Dashboard}
+      - NEXT_PUBLIC_BRAND_LOGO_URL=${BRAND_LOGO_URL}
+      - NEXT_PUBLIC_PRIMARY_COLOR=${PRIMARY_COLOR:-#3b82f6}
+      - NEXT_PUBLIC_SECONDARY_COLOR=${SECONDARY_COLOR:-#06b6d4}
+      - NEXT_PUBLIC_ACCENT_COLOR=${ACCENT_COLOR:-#8b5cf6}
+      - NEXT_PUBLIC_ENABLE_REALTIME=${ENABLE_REALTIME:-true}
+      - NEXT_PUBLIC_ENABLE_EXPORT=${ENABLE_EXPORT:-true}
+      - NEXT_PUBLIC_ENABLE_ALERTS=${ENABLE_ALERTS:-true}
+    volumes:
+      - ./public:/app/public:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - monitoring
+
+  # Optional: Nginx reverse proxy for SSL termination
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - dashboard
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  ssl_certificates:
+    driver: local
