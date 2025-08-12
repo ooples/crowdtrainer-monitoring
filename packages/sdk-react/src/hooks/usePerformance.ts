@@ -96,7 +96,9 @@ export const usePerformance = (options: {
   // Track Web Vitals metrics
   const setupWebVitalsTracking = useCallback(() => {
     if (!trackWebVitals || !isEnabled || !enabled || typeof PerformanceObserver === 'undefined') {
-      return;
+      return () => {
+        // No cleanup needed if tracking is disabled
+      };
     }
     
     // Largest Contentful Paint (LCP)
@@ -133,7 +135,8 @@ export const usePerformance = (options: {
       const fidObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
         entries.forEach((entry) => {
-          const fid = entry.processingStart - entry.startTime;
+          const fidEntry = entry as PerformanceEntry & { processingStart?: number };
+          const fid = (fidEntry.processingStart || 0) - entry.startTime;
           
           setPerformanceData(prev => ({ ...prev, FID: fid }));
           
@@ -225,6 +228,11 @@ export const usePerformance = (options: {
     } catch (e) {
       console.warn('[Monitor] Navigation observer not supported');
     }
+    
+    // Return cleanup function for all observers set up
+    return () => {
+      // Cleanup will be handled by the main useEffect cleanup
+    };
     
   }, [trackWebVitals, isEnabled, enabled, monitor, metadata, getPerformanceRating, reportInterval]);
   

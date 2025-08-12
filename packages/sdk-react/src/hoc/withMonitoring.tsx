@@ -1,4 +1,4 @@
-import React, { ComponentType, useEffect, useRef, forwardRef, Ref } from 'react';
+import React, { ComponentType, useEffect, useRef, forwardRef } from 'react';
 import { useMonitor, useMonitorLifecycle } from '../hooks/useMonitor';
 import { usePerformanceMetric } from '../hooks/useMetric';
 import { EventMetadata, WithMonitoringProps } from '../types';
@@ -114,7 +114,7 @@ export function withMonitoring<P extends object>(
     const performanceIssues = useRef(0);
     
     // Lifecycle tracking
-    const { trackUpdate } = useMonitorLifecycle(componentName, {
+    const { trackUpdate: _trackUpdate } = useMonitorLifecycle(componentName, {
       trackMounts: trackLifecycle,
       trackUpdates: trackRenders,
       trackUnmounts: trackLifecycle,
@@ -122,14 +122,16 @@ export function withMonitoring<P extends object>(
     });
     
     // Performance tracking
-    const { measureAsync, measureSync, recordDuration } = usePerformanceMetric({
+    const { measureAsync: _measureAsync, measureSync: _measureSync, recordDuration } = usePerformanceMetric({
       metadata: { ...metadata, component: componentName },
       enabled: trackPerformance
     });
     
     // Track renders and performance
     useEffect(() => {
-      if (!isEnabled) return;
+      if (!isEnabled) return () => {
+        // No cleanup needed if monitoring is disabled
+      };
       
       const renderStartTime = performance.now();
       renderCount.current++;
@@ -209,11 +211,16 @@ export function withMonitoring<P extends object>(
         
         lastProps.current = { ...currentProps };
       }
+      
+      // Return empty cleanup function
+      return () => {};
     });
     
     // Error boundary functionality (if trackErrors is enabled)
     useEffect(() => {
-      if (!trackErrors || !isEnabled) return;
+      if (!trackErrors || !isEnabled) return () => {
+        // No cleanup needed if error tracking is disabled
+      };
       
       const handleError = (error: ErrorEvent) => {
         errorCount.current++;
@@ -263,6 +270,9 @@ export function withMonitoring<P extends object>(
           window.removeEventListener('unhandledrejection', handleUnhandledRejection);
         };
       }
+      
+      // Return empty cleanup function if no global listeners were added
+      return () => {};
     }, [trackErrors, isEnabled, monitor, componentName, metadata, debug]);
     
     // Wrap event handlers to track interactions
@@ -278,11 +288,22 @@ export function withMonitoring<P extends object>(
         const originalHandler = componentProps[handlerName];
         if (typeof originalHandler === 'function') {
           wrappedProps[handlerName] = (...args: any[]) => {
+            // Map handler names to interaction types
+            const interactionTypeMap: Record<string, 'click' | 'hover' | 'focus' | 'scroll' | 'input' | 'submit'> = {
+              onClick: 'click',
+              onSubmit: 'submit',
+              onChange: 'input',
+              onFocus: 'focus',
+              onBlur: 'focus'
+            };
+            
+            const interactionType = interactionTypeMap[handlerName] || 'click';
+            
             // Track interaction
             monitor.trackEvent('component_interaction', {
               ...metadata,
               component: componentName,
-              interactionType: handlerName,
+              interactionType,
               timestamp: new Date().toISOString(),
               renderCount: renderCount.current
             });
@@ -359,7 +380,7 @@ export function withMonitoring<P extends object>(
   WithMonitoringComponent.displayName = 
     displayName || `withMonitoring(${componentName})`;
   
-  return WithMonitoringComponent;
+  return WithMonitoringComponent as unknown as ComponentType<P & WithMonitoringProps>;
 }
 
 /**
@@ -432,5 +453,3 @@ export const createMonitoredComponents = <T extends Record<string, ComponentType
   
   return monitoredComponents;
 };
-
-export type { WithMonitoringOptions };

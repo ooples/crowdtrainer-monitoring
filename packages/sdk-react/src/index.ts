@@ -46,7 +46,7 @@ export { usePerformance } from './hooks/usePerformance';
 
 // Higher-order component
 export { withMonitoring } from './hoc/withMonitoring';
-export type { WithMonitoringProps } from './hoc/withMonitoring';
+export type { WithMonitoringOptions } from './hoc/withMonitoring';
 
 // Router integrations
 export { ReactRouterIntegration } from './integrations/router';
@@ -59,5 +59,6 @@ export type {
   EventMetadata,
   MonitoringHook,
   ComponentRenderMetric,
-  UserInteractionEvent
+  UserInteractionEvent,
+  WithMonitoringProps
 } from './types';

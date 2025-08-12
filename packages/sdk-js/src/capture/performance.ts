@@ -44,12 +44,12 @@ export class PerformanceCapture {
 
     if (this.observer) {
       this.observer.disconnect();
-      this.observer = undefined;
+      delete this.observer;
     }
 
     if (this.longTaskObserver) {
       this.longTaskObserver.disconnect();
-      this.longTaskObserver = undefined;
+      delete this.longTaskObserver;
     }
   }
 
@@ -68,10 +68,15 @@ export class PerformanceCapture {
 
   /** Get current performance metrics */
   getMetrics(): PerformanceMetrics {
-    return {
-      navigation: this.navigationEntry,
+    const metrics: PerformanceMetrics = {
       resources: [...this.resourceEntries],
     };
+    
+    if (this.navigationEntry) {
+      metrics.navigation = this.navigationEntry;
+    }
+    
+    return metrics;
   }
 
   /** Manually capture current performance state */
@@ -205,7 +210,7 @@ export class PerformanceCapture {
   /** Calculate page load time */
   getPageLoadTime(): number | null {
     if (!this.navigationEntry) return null;
-    return this.navigationEntry.loadEventEnd - this.navigationEntry.navigationStart;
+    return this.navigationEntry.loadEventEnd - this.navigationEntry.fetchStart;
   }
 
   /** Calculate time to first byte */
@@ -217,7 +222,7 @@ export class PerformanceCapture {
   /** Calculate DOM content loaded time */
   getDOMContentLoadedTime(): number | null {
     if (!this.navigationEntry) return null;
-    return this.navigationEntry.domContentLoadedEventEnd - this.navigationEntry.navigationStart;
+    return this.navigationEntry.domContentLoadedEventEnd - this.navigationEntry.fetchStart;
   }
 
   /** Get slow resources (>1s load time) */
@@ -230,7 +235,7 @@ export class PerformanceCapture {
     const data: Record<string, any> = {};
 
     if (metrics.navigation) {
-      data.loadTime = metrics.navigation.loadEventEnd - metrics.navigation.navigationStart;
+      data.loadTime = metrics.navigation.loadEventEnd - metrics.navigation.fetchStart;
       data.ttfb = metrics.navigation.responseStart - metrics.navigation.requestStart;
     }
 

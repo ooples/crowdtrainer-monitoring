@@ -21,6 +21,11 @@ Object.defineProperty(window, 'performance', {
 global.PerformanceObserver = class PerformanceObserver {
   callback: PerformanceObserverCallback;
   
+  static readonly supportedEntryTypes: readonly string[] = [
+    'navigation', 'resource', 'paint', 'measure', 'mark', 'largest-contentful-paint',
+    'first-input', 'layout-shift', 'longtask'
+  ];
+  
   constructor(callback: PerformanceObserverCallback) {
     this.callback = callback;
   }

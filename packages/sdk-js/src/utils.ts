@@ -47,7 +47,7 @@ export function hasLocalStorage(): boolean {
 /** Safely stringify JSON with circular reference handling */
 export function safeStringify(obj: any): string {
   const seen = new WeakSet();
-  return JSON.stringify(obj, (key, value) => {
+  return JSON.stringify(obj, (_key, value) => {
     if (typeof value === 'object' && value !== null) {
       if (seen.has(value)) {
         return '[Circular]';
@@ -64,13 +64,13 @@ export function throttle<T extends (...args: any[]) => void>(
   limit: number
 ): T {
   let inThrottle: boolean;
-  return ((...args: Parameters<T>) => {
+  return function(this: any, ...args: Parameters<T>) {
     if (!inThrottle) {
       func.apply(this, args);
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }
-  }) as T;
+  } as T;
 }
 
 /** Debounce function calls */
@@ -79,10 +79,10 @@ export function debounce<T extends (...args: any[]) => void>(
   delay: number
 ): T {
   let timeoutId: NodeJS.Timeout;
-  return ((...args: Parameters<T>) => {
+  return function(this: any, ...args: Parameters<T>) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func.apply(this, args), delay);
-  }) as T;
+  } as T;
 }
 
 /** Get page URL */
@@ -122,11 +122,16 @@ export function getErrorDetails(error: Error | any): {
   name: string;
 } {
   if (error instanceof Error) {
-    return {
+    const result: { message: string; stack?: string; name: string } = {
       message: error.message,
-      stack: error.stack,
       name: error.name,
     };
+    
+    if (error.stack) {
+      result.stack = error.stack;
+    }
+    
+    return result;
   }
   
   return {

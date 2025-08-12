@@ -12,7 +12,14 @@ export default [
       format: 'esm',
       sourcemap: true
     },
-    external: (id) => !id.startsWith('.') && !id.startsWith('/'),
+    external: (id) => {
+      // Don't mark the entry module as external
+      if (id === 'src/index.ts' || id.includes('packages/core/src')) {
+        return false;
+      }
+      // Mark node_modules as external
+      return !id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0');
+    },
     plugins: [
       resolve({
         preferBuiltins: true
@@ -33,7 +40,14 @@ export default [
       format: 'cjs',
       sourcemap: true
     },
-    external: (id) => !id.startsWith('.') && !id.startsWith('/'),
+    external: (id) => {
+      // Don't mark the entry module as external
+      if (id === 'src/index.ts' || id.includes('packages/core/src')) {
+        return false;
+      }
+      // Mark node_modules as external
+      return !id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0');
+    },
     plugins: [
       resolve({
         preferBuiltins: true

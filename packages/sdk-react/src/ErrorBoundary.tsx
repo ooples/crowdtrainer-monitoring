@@ -106,7 +106,9 @@ class ErrorBoundaryClass extends Component<
     
     // Update state with error info
     this.setState({
-      errorInfo
+      errorInfo: {
+        componentStack: errorInfo.componentStack || 'No component stack available'
+      }
     });
     
     // Track error with monitoring service
@@ -116,7 +118,7 @@ class ErrorBoundaryClass extends Component<
         error,
         {
           ...metadata,
-          componentStack: errorInfo.componentStack,
+          componentStack: errorInfo.componentStack || 'No component stack available',
           errorBoundaryLevel: level,
           errorId: this.state.errorId
         }

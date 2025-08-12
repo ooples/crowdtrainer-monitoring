@@ -4,8 +4,8 @@ import type {
   UserContext, 
   SessionContext, 
   Breadcrumb,
-  ErrorCapture,
-  NetworkCapture,
+  ErrorCaptureData,
+  NetworkCaptureData,
   PerformanceMetrics,
   TransportOptions
 } from './types';
@@ -183,7 +183,7 @@ export class Monitor {
 
   /** Clear user context */
   clearUser(): void {
-    this.user = undefined;
+    delete this.user;
     this.storage.remove('user');
     
     this.addBreadcrumb({
@@ -387,7 +387,7 @@ export class Monitor {
 
   /** Start error capture */
   private startErrorCapture(): void {
-    this.errorCapture.addListener((error: ErrorCapture) => {
+    this.errorCapture.addListener((error: ErrorCaptureData) => {
       const event: MonitorEvent = {
         type: 'error',
         timestamp: error.timestamp,
@@ -407,7 +407,7 @@ export class Monitor {
 
   /** Start network capture */
   private startNetworkCapture(): void {
-    this.networkCapture.addListener((request: NetworkCapture) => {
+    this.networkCapture.addListener((request: NetworkCaptureData) => {
       // Filter out monitoring API requests
       if (!this.networkCapture.shouldCapture(request.url)) return;
 

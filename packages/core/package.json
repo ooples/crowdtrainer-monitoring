@@ -11,9 +11,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "rollup -c",
-    "build:watch": "rollup -c -w",
-    "dev": "rollup -c -w",
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "dev": "tsc -w",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

@@ -364,5 +364,3 @@ export async function runMigration(name: string, sql: string): Promise<void> {
     throw error;
   }
 }
-
-export { DatabaseManager };

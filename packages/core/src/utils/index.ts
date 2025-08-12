@@ -108,7 +108,7 @@ export function deepClone<T>(obj: T): T {
  * Deep merge two objects
  */
 export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-  const result = { ...target };
+  const result = { ...target } as T;
   
   for (const key in source) {
     if (source.hasOwnProperty(key)) {
@@ -116,9 +116,9 @@ export function deepMerge<T extends Record<string, any>>(target: T, source: Part
       const targetValue = result[key];
       
       if (isPlainObject(sourceValue) && isPlainObject(targetValue)) {
-        result[key] = deepMerge(targetValue, sourceValue);
-      } else {
-        result[key] = sourceValue;
+        (result as any)[key] = deepMerge(targetValue, sourceValue);
+      } else if (sourceValue !== undefined) {
+        (result as any)[key] = sourceValue;
       }
     }
   }
@@ -142,7 +142,7 @@ export function isPlainObject(value: any): value is Record<string, any> {
 export function safeStringify(obj: any, space?: number): string {
   const seen = new WeakSet();
   
-  return JSON.stringify(obj, (key, value) => {
+  return JSON.stringify(obj, (_key, value) => {
     if (typeof value === 'object' && value !== null) {
       if (seen.has(value)) {
         return '[Circular Reference]';
@@ -285,7 +285,7 @@ export function getEnvironment(): 'browser' | 'node' | 'worker' | 'unknown' {
     return 'node';
   }
   
-  if (typeof self !== 'undefined' && typeof importScripts === 'function') {
+  if (typeof self !== 'undefined' && typeof (self as any).importScripts === 'function') {
     return 'worker';
   }
   

@@ -1,27 +1,24 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2018",
-    "lib": ["DOM", "DOM.Iterable", "ES2018"],
+    "module": "ESNext",
     "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "noEmit": false,
     "jsx": "react-jsx",
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     }
   },
   "include": [
@@ -31,6 +28,7 @@
     "node_modules",
     "dist",
     "**/*.test.*",
-    "**/*.spec.*"
+    "**/*.spec.*",
+    "**/setupTests.*"
   ]
 }

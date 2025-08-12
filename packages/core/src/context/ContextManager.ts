@@ -10,7 +10,7 @@ import {
   JSONValue,
   Logger 
 } from '../types/index.js';
-import { getUserAgent, getCurrentURL, getPageTitle, getEnvironment } from '../utils/index.js';
+import { getUserAgent, getEnvironment } from '../utils/index.js';
 
 export interface ContextManagerConfig {
   /** Enable automatic device context detection */
@@ -55,7 +55,7 @@ export class ContextManager {
    */
   setUser(user: UserContext): void {
     this.context.user = { ...this.context.user, ...user };
-    this.config.logger.debug('ContextManager: User context updated', this.context.user);
+    this.config.logger.debug('ContextManager: User context updated', this.context.user as unknown as JSONValue);
   }
 
   /**
@@ -70,7 +70,7 @@ export class ContextManager {
    */
   setDevice(device: Partial<DeviceContext>): void {
     this.context.device = { ...this.context.device, ...device };
-    this.config.logger.debug('ContextManager: Device context updated', this.context.device);
+    this.config.logger.debug('ContextManager: Device context updated', this.context.device as unknown as JSONValue);
   }
 
   /**
@@ -84,8 +84,8 @@ export class ContextManager {
    * Set app context
    */
   setApp(app: Partial<AppContext>): void {
-    this.context.app = { ...this.context.app, ...app };
-    this.config.logger.debug('ContextManager: App context updated', this.context.app);
+    this.context.app = { ...this.context.app, ...app } as AppContext;
+    this.config.logger.debug('ContextManager: App context updated', this.context.app as unknown as JSONValue);
   }
 
   /**
@@ -135,12 +135,20 @@ export class ContextManager {
    * Get full context
    */
   getContext(): Context {
-    return {
-      user: this.context.user ? { ...this.context.user } : undefined,
-      device: this.context.device ? { ...this.context.device } : undefined,
-      app: this.context.app ? { ...this.context.app } : undefined,
-      custom: this.context.custom ? { ...this.context.custom } : undefined
-    };
+    const result: Context = {};
+    if (this.context.user) {
+      result.user = { ...this.context.user };
+    }
+    if (this.context.device) {
+      result.device = { ...this.context.device };
+    }
+    if (this.context.app) {
+      result.app = { ...this.context.app };
+    }
+    if (this.context.custom) {
+      result.custom = { ...this.context.custom };
+    }
+    return result;
   }
 
   /**
@@ -189,18 +197,23 @@ export class ContextManager {
     const fullContext = this.getContext();
     
     switch (scope) {
-      case 'user':
-        return { user: fullContext.user };
-      case 'session':
-        return { 
-          user: fullContext.user,
-          custom: fullContext.custom 
-        };
-      case 'app':
-        return {
-          app: fullContext.app,
-          device: fullContext.device
-        };
+      case 'user': {
+        const result: Context = {};
+        if (fullContext.user) result.user = fullContext.user;
+        return result;
+      }
+      case 'session': {
+        const result: Context = {};
+        if (fullContext.user) result.user = fullContext.user;
+        if (fullContext.custom) result.custom = fullContext.custom;
+        return result;
+      }
+      case 'app': {
+        const result: Context = {};
+        if (fullContext.app) result.app = fullContext.app;
+        if (fullContext.device) result.device = fullContext.device;
+        return result;
+      }
       case 'all':
       default:
         return fullContext;
@@ -239,10 +252,18 @@ export class ContextManager {
     
     const device: DeviceContext = {
       userAgent,
-      platform: this.detectPlatform(userAgent),
-      timezone: this.detectTimezone(),
-      locale: this.detectLocale()
+      platform: this.detectPlatform(userAgent)
     };
+    
+    const timezone = this.detectTimezone();
+    if (timezone !== undefined) {
+      device.timezone = timezone;
+    }
+    
+    const locale = this.detectLocale();
+    if (locale !== undefined) {
+      device.locale = locale;
+    }
 
     if (environment === 'browser') {
       this.detectBrowserDeviceContext(device);
@@ -274,8 +295,14 @@ export class ContextManager {
 
     // Parse user agent for detailed info
     const ua = device.userAgent || '';
-    device.os = this.parseOSFromUserAgent(ua);
-    device.osVersion = this.parseOSVersionFromUserAgent(ua);
+    const os = this.parseOSFromUserAgent(ua);
+    if (os) {
+      device.os = os;
+    }
+    const osVersion = this.parseOSVersionFromUserAgent(ua);
+    if (osVersion !== undefined) {
+      device.osVersion = osVersion;
+    }
   }
 
   /**

@@ -46,11 +46,11 @@ export interface CapturedError extends ErrorInfo {
   /** Error context */
   context?: Context;
   /** User agent */
-  userAgent?: string;
+  userAgent: string;
   /** URL where error occurred */
-  url?: string;
+  url: string;
   /** Additional breadcrumbs */
-  breadcrumbs?: Breadcrumb[];
+  breadcrumbs: Breadcrumb[];
 }
 
 export interface Breadcrumb {
@@ -119,13 +119,13 @@ export class ErrorCapture {
     }
 
     const capturedError: CapturedError = {
+      ...errorInfo,
       id: generateId(),
       timestamp: getCurrentTimestamp(),
       context: { ...this.context, ...context },
-      userAgent: typeof window !== 'undefined' ? window.navigator?.userAgent : undefined,
-      url: typeof window !== 'undefined' ? window.location?.href : undefined,
-      breadcrumbs: [...this.breadcrumbs],
-      ...errorInfo
+      userAgent: typeof window !== 'undefined' ? (window.navigator?.userAgent ?? 'Unknown') : 'Node.js',
+      url: typeof window !== 'undefined' ? (window.location?.href ?? '') : '',
+      breadcrumbs: [...this.breadcrumbs]
     };
 
     // Apply plugins
@@ -134,14 +134,14 @@ export class ErrorCapture {
       return ''; // Error was filtered out by plugins
     }
 
-    this.config.logger.debug('ErrorCapture: Capturing error', processedError);
+    this.config.logger.debug('ErrorCapture: Capturing error', processedError as unknown as JSONValue);
     this.errorBuffer.push(processedError);
 
     // Add breadcrumb for captured error
     this.addBreadcrumb(`Error captured: ${processedError.message}`, 'error', 'error', {
       errorId: processedError.id,
-      severity: processedError.severity
-    });
+      severity: processedError.severity ?? 'unknown'
+    } as Record<string, JSONValue>);
 
     if (this.errorBuffer.length >= this.config.maxBufferSize) {
       this.flush();
@@ -166,10 +166,10 @@ export class ErrorCapture {
       name: error.name,
       severity: options.severity ?? this.config.defaultSeverity,
       category: options.category,
-      data: {
+      data: options.tags || options.fingerprint ? {
         ...options.tags,
         fingerprint: options.fingerprint
-      }
+      } : undefined
     };
 
     return this.captureError(errorInfo, options.context);
@@ -188,7 +188,7 @@ export class ErrorCapture {
       message,
       severity: options.severity ?? 'low',
       category: options.category ?? 'user',
-      data: options.data
+      ...(options.data && { data: options.data })
     };
 
     return this.captureError(errorInfo, options.context);
@@ -199,7 +199,7 @@ export class ErrorCapture {
    */
   setContext(context: Partial<Context>): void {
     this.context = { ...this.context, ...context };
-    this.config.logger.debug('ErrorCapture: Context updated', this.context);
+    this.config.logger.debug('ErrorCapture: Context updated', this.context as unknown as JSONValue);
   }
 
   /**
@@ -211,7 +211,7 @@ export class ErrorCapture {
       message,
       category,
       level,
-      data
+      ...(data && { data })
     };
 
     this.breadcrumbs.push(breadcrumb);
@@ -221,7 +221,7 @@ export class ErrorCapture {
       this.breadcrumbs = this.breadcrumbs.slice(-100);
     }
 
-    this.config.logger.debug('ErrorCapture: Breadcrumb added', breadcrumb);
+    this.config.logger.debug('ErrorCapture: Breadcrumb added', breadcrumb as unknown as JSONValue);
   }
 
   /**
@@ -251,14 +251,22 @@ export class ErrorCapture {
         // Handle promises
         if (result && typeof result.catch === 'function') {
           return result.catch((error: Error) => {
-            self.captureException(error, { context });
+            if (context) {
+              self.captureException(error, { context });
+            } else {
+              self.captureException(error);
+            }
             throw error;
           });
         }
         
         return result;
       } catch (error) {
-        self.captureException(error as Error, { context });
+        if (context) {
+          self.captureException(error as Error, { context });
+        } else {
+          self.captureException(error as Error);
+        }
         throw error;
       }
     }) as T;
@@ -333,13 +341,19 @@ export class ErrorCapture {
     }
 
     if (error instanceof Error) {
-      return {
+      const result: ErrorInfo = {
         message: error.message,
-        stack: this.cleanStackTrace(error.stack),
         name: error.name,
         severity: this.config.defaultSeverity,
         category: 'javascript'
       };
+      
+      const cleanedStack = this.cleanStackTrace(error.stack);
+      if (cleanedStack) {
+        result.stack = cleanedStack;
+      }
+      
+      return result;
     }
 
     return {
@@ -416,20 +430,20 @@ export class ErrorCapture {
     window.onerror = (message, filename, lineno, colno, error) => {
       const errorInfo: ErrorInfo = {
         message: typeof message === 'string' ? message : 'Unknown error',
-        filename,
-        lineno,
-        colno,
-        stack: error?.stack,
-        name: error?.name,
         severity: 'high',
-        category: 'javascript'
+        category: 'javascript',
+        ...(filename && { filename }),
+        ...(lineno && { lineno }),
+        ...(colno && { colno }),
+        ...(error?.stack && { stack: error.stack }),
+        ...(error?.name && { name: error.name })
       };
 
       this.captureError(errorInfo);
 
       // Call original handler
       if (this.originalHandlers.onError) {
-        return this.originalHandlers.onError.call(window, message, filename, lineno, colno, error);
+        return this.originalHandlers.onError(message as string, filename, lineno, colno, error);
       }
     };
 
@@ -443,10 +457,10 @@ export class ErrorCapture {
         if (error instanceof Error) {
           errorInfo = {
             message: `Unhandled Promise Rejection: ${error.message}`,
-            stack: error.stack,
-            name: error.name,
             severity: 'high',
-            category: 'javascript'
+            category: 'javascript',
+            ...(error.stack && { stack: error.stack }),
+            ...(error.name && { name: error.name })
           };
         } else {
           errorInfo = {

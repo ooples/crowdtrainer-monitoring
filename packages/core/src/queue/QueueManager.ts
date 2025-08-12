@@ -45,7 +45,7 @@ export interface QueueStats {
 export class QueueManager {
   private config: Required<QueueManagerConfig>;
   private queue: QueueItem[] = [];
-  private cleanupTimer?: NodeJS.Timer;
+  private cleanupTimer?: NodeJS.Timeout;
   private isDestroyed = false;
 
   constructor(config: QueueManagerConfig = {}) {
@@ -166,7 +166,7 @@ export class QueueManager {
       return false;
     }
 
-    const item = this.queue.splice(index, 1)[0];
+    const item = this.queue.splice(index, 1)[0]!;
     item.priority = priority;
     this.insertByPriority(item);
 
@@ -247,7 +247,8 @@ export class QueueManager {
     
     const priorityDistribution: Record<number, number> = {};
     for (const item of this.queue) {
-      priorityDistribution[item.priority!] = (priorityDistribution[item.priority!] || 0) + 1;
+      const priority = item.priority ?? 0;
+      priorityDistribution[priority] = (priorityDistribution[priority] || 0) + 1;
     }
 
     return {
@@ -382,7 +383,7 @@ export class QueueManager {
    */
   async import(items: QueueItem[]): Promise<void> {
     this.queue = items.map(item => ({ ...item }));
-    this.queue.sort((a, b) => a.priority! - b.priority!);
+    this.queue.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
 
     // Enforce size limit
     if (this.queue.length > this.config.maxSize) {
@@ -418,7 +419,7 @@ export class QueueManager {
     if (config.maxSize && this.queue.length > config.maxSize) {
       this.queue = this.queue.slice(0, config.maxSize);
       this.persistToStorage().catch(error => {
-        this.config.logger.error('QueueManager: Failed to persist after size reduction', error);
+        this.config.logger.error('QueueManager: Failed to persist after size reduction', error as unknown as JSONValue);
       });
     }
   }
@@ -437,7 +438,7 @@ export class QueueManager {
    * Insert item maintaining priority order (lower priority = higher precedence)
    */
   private insertByPriority(item: QueueItem): void {
-    const insertIndex = this.queue.findIndex(existing => existing.priority! > item.priority!);
+    const insertIndex = this.queue.findIndex(existing => (existing.priority ?? 0) > (item.priority ?? 0));
     
     if (insertIndex === -1) {
       this.queue.push(item);
@@ -454,14 +455,14 @@ export class QueueManager {
       const stored = await this.config.storage.getItem('queue_data');
       if (stored) {
         const items: QueueItem[] = JSON.parse(stored);
-        this.queue = items.sort((a, b) => a.priority! - b.priority!);
+        this.queue = items.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
         
         this.config.logger.debug('QueueManager: Loaded from storage', {
           size: this.queue.length
         });
       }
     } catch (error) {
-      this.config.logger.error('QueueManager: Failed to load from storage', error);
+      this.config.logger.error('QueueManager: Failed to load from storage', error as unknown as JSONValue);
     }
   }
 
@@ -473,7 +474,7 @@ export class QueueManager {
       const data = JSON.stringify(this.queue);
       await this.config.storage.setItem('queue_data', data);
     } catch (error) {
-      this.config.logger.error('QueueManager: Failed to persist to storage', error);
+      this.config.logger.error('QueueManager: Failed to persist to storage', error as unknown as JSONValue);
     }
   }
 
@@ -483,7 +484,7 @@ export class QueueManager {
   private startAutoCleanup(): void {
     this.cleanupTimer = setInterval(() => {
       this.cleanup().catch(error => {
-        this.config.logger.error('QueueManager: Auto cleanup failed', error);
+        this.config.logger.error('QueueManager: Auto cleanup failed', error as unknown as JSONValue);
       });
     }, this.config.cleanupInterval);
   }

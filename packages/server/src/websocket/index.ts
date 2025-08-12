@@ -38,10 +38,11 @@ export class WebSocketManager {
   // Initialize WebSocket routes
   async initializeRoutes(fastify: FastifyInstance): Promise<void> {
     // Main WebSocket endpoint
+    const self = this;
     await fastify.register(async function (fastify) {
       fastify.get('/ws', { websocket: true }, async (connection, request) => {
-        await this.handleConnection(connection, request);
-      }.bind(this));
+        await self.handleConnection(connection, request);
+      });
     });
 
     // WebSocket with authentication
@@ -54,14 +55,14 @@ export class WebSocketManager {
           return;
         }
 
-        const validApiKey = await this.auth.authenticateApiKey(apiKey);
+        const validApiKey = await self.auth.authenticateApiKey(apiKey);
         if (!validApiKey) {
           connection.close(1008, 'Invalid API key');
           return;
         }
 
-        await this.handleConnection(connection, request, validApiKey.id);
-      }.bind(this));
+        await self.handleConnection(connection, request, validApiKey.id);
+      });
     });
   }
 
@@ -541,5 +542,3 @@ export function getWebSocketManager(): WebSocketManager {
   }
   return wsManager;
 }
-
-export { WebSocketManager };

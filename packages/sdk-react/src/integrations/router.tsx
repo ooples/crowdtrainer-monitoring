@@ -201,7 +201,7 @@ export const ReactRouterIntegration: React.FC<RouterIntegrationProps> = ({
     }
     
     // Listen for browser navigation (back/forward buttons)
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = (_event: PopStateEvent) => {
       handleNavigation(window.location.pathname, 'pop');
     };
     
@@ -461,4 +461,4 @@ function isBacktracking(routeHistory: string[]): boolean {
   return current === beforePrevious;
 }
 
-export type { RouterIntegrationProps, NavigationTiming };
+export type { NavigationTiming };

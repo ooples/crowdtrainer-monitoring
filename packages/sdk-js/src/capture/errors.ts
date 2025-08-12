@@ -1,4 +1,4 @@
-import type { ErrorCapture, Breadcrumb } from '../types';
+import type { ErrorCaptureData, Breadcrumb } from '../types';
 import { now, isBrowser, getErrorDetails } from '../utils';
 
 /**
@@ -6,13 +6,14 @@ import { now, isBrowser, getErrorDetails } from '../utils';
  */
 export class ErrorCapture {
   private isEnabled: boolean = false;
-  private listeners: Array<(error: ErrorCapture) => void> = [];
+  private listeners: Array<(error: ErrorCaptureData) => void> = [];
   private originalWindowErrorHandler?: OnErrorEventHandler;
-  private originalUnhandledRejectionHandler?: (event: PromiseRejectionEvent) => void;
+  private originalUnhandledRejectionHandler?: ((event: PromiseRejectionEvent) => void) | null;
 
   constructor() {
     this.handleWindowError = this.handleWindowError.bind(this);
     this.handleUnhandledRejection = this.handleUnhandledRejection.bind(this);
+    this.handleGlobalError = this.handleGlobalError.bind(this);
   }
 
   /** Start capturing errors */
@@ -30,7 +31,7 @@ export class ErrorCapture {
     window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
 
     // Global error handler (fallback)
-    window.onerror = this.handleWindowError;
+    window.onerror = this.handleGlobalError;
     window.onunhandledrejection = this.handleUnhandledRejection;
   }
 
@@ -50,12 +51,12 @@ export class ErrorCapture {
   }
 
   /** Add error listener */
-  addListener(listener: (error: ErrorCapture) => void): void {
+  addListener(listener: (error: ErrorCaptureData) => void): void {
     this.listeners.push(listener);
   }
 
   /** Remove error listener */
-  removeListener(listener: (error: ErrorCapture) => void): void {
+  removeListener(listener: (error: ErrorCaptureData) => void): void {
     const index = this.listeners.indexOf(listener);
     if (index > -1) {
       this.listeners.splice(index, 1);
@@ -65,7 +66,7 @@ export class ErrorCapture {
   /** Manually capture an error */
   captureError(error: Error | any, context?: Record<string, any>): void {
     const errorDetails = getErrorDetails(error);
-    const errorCapture: ErrorCapture = {
+    const errorCapture: ErrorCaptureData = {
       message: errorDetails.message,
       stack: errorDetails.stack,
       type: errorDetails.name,
@@ -76,9 +77,52 @@ export class ErrorCapture {
     this.notifyListeners(errorCapture);
   }
 
+  /** Handle global error events (window.onerror) */
+  private handleGlobalError(
+    message: string | Event,
+    source?: string,
+    lineno?: number,
+    colno?: number,
+    error?: Error
+  ): boolean | void {
+    let errorCapture: ErrorCaptureData;
+
+    if (typeof message === 'string') {
+      // String error message
+      errorCapture = {
+        message,
+        stack: error?.stack,
+        type: error?.name || 'Error',
+        filename: source,
+        lineno,
+        colno,
+        timestamp: now(),
+      };
+    } else {
+      // Event object (fallback)
+      const target = message.target as HTMLElement;
+      const tagName = target?.tagName?.toLowerCase();
+      const src = (target as any)?.src || (target as any)?.href;
+      
+      errorCapture = {
+        message: `Failed to load ${tagName}: ${src}`,
+        type: 'ResourceError',
+        filename: src,
+        timestamp: now(),
+      };
+    }
+
+    this.notifyListeners(errorCapture);
+
+    // Call original handler if it exists
+    if (this.originalWindowErrorHandler) {
+      return this.originalWindowErrorHandler.call(window, message, source, lineno, colno, error);
+    }
+  }
+
   /** Handle window error events */
   private handleWindowError(event: ErrorEvent | Event): void {
-    let errorCapture: ErrorCapture;
+    let errorCapture: ErrorCaptureData;
 
     if (event instanceof ErrorEvent) {
       // Regular JavaScript error
@@ -141,7 +185,7 @@ export class ErrorCapture {
       }
     }
 
-    const errorCapture: ErrorCapture = {
+    const errorCapture: ErrorCaptureData = {
       message,
       stack,
       type,
@@ -157,7 +201,7 @@ export class ErrorCapture {
   }
 
   /** Notify all listeners of error */
-  private notifyListeners(error: ErrorCapture): void {
+  private notifyListeners(error: ErrorCaptureData): void {
     this.listeners.forEach(listener => {
       try {
         listener(error);
@@ -202,7 +246,7 @@ export class ErrorCapture {
   }
 
   /** Generate breadcrumb from error */
-  static toBreadcrumb(error: ErrorCapture): Breadcrumb {
+  static toBreadcrumb(error: ErrorCaptureData): Breadcrumb {
     return {
       timestamp: error.timestamp,
       type: 'error',

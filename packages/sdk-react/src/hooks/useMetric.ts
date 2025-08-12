@@ -98,7 +98,7 @@ export const usePerformanceMetric = (options: {
   const { monitor, isEnabled } = useMonitor();
   const timers = useRef<Map<string, number>>(new Map());
   const {
-    autoTrack = false,
+    autoTrack: _autoTrack = false,
     metadata = {},
     enabled = true
   } = options;
@@ -247,7 +247,7 @@ export const useResourceMetrics = (options: {
 } = {}) => {
   const { monitor, isEnabled } = useMonitor();
   const {
-    trackInterval = 60000, // 1 minute
+    trackInterval: _trackInterval = 60000, // 1 minute
     enabled = true,
     metadata = {}
   } = options;

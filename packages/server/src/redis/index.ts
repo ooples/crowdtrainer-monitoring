@@ -427,5 +427,3 @@ export function getRedis(): RedisManager {
   }
   return redisManager;
 }
-
-export { RedisManager };

@@ -72,6 +72,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "CrowdTrainer Team",
+  "author": "App Monitor Team",
   "license": "MIT"
 }

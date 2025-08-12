@@ -1,14 +1,8 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -29,16 +23,35 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "paths": {
-      "@/*": ["./src/*"],
-      "@/database/*": ["./src/database/*"],
-      "@/redis/*": ["./src/redis/*"],
-      "@/routes/*": ["./src/routes/*"],
-      "@/middleware/*": ["./src/middleware/*"],
-      "@/auth/*": ["./src/auth/*"],
-      "@/websocket/*": ["./src/websocket/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/utils/*": ["./src/utils/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ],
+      "@/database/*": [
+        "./src/database/*"
+      ],
+      "@/redis/*": [
+        "./src/redis/*"
+      ],
+      "@/routes/*": [
+        "./src/routes/*"
+      ],
+      "@/middleware/*": [
+        "./src/middleware/*"
+      ],
+      "@/auth/*": [
+        "./src/auth/*"
+      ],
+      "@/websocket/*": [
+        "./src/websocket/*"
+      ],
+      "@/types/*": [
+        "./src/types/*"
+      ],
+      "@/utils/*": [
+        "./src/utils/*"
+      ]
+    },
+    "composite": true
   },
   "include": [
     "src/**/*"

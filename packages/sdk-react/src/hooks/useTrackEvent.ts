@@ -251,6 +251,9 @@ export const useTrackPageView = (options: {
         window.removeEventListener('scroll', handleScroll);
       };
     }
+    
+    // Return empty cleanup function if no tracking is set up
+    return () => {};
   }, [isEnabled, enabled, monitor, metadata, trackTimeOnPage, trackScrollDepth, scrollThresholds]);
   
   return trackPageView;
@@ -352,7 +355,7 @@ export const useTrackForm = (formName: string, options: {
     }
   }, [trackEvent, options.trackAllFields]);
   
-  const trackFormSubmit = useCallback((submitMetadata?: EventMetadata) => (event: React.FormEvent) => {
+  const trackFormSubmit = useCallback((submitMetadata?: EventMetadata) => (_event: React.FormEvent) => {
     const formCompletionTime = formStartTime.current ? Date.now() - formStartTime.current : 0;
     const totalFields = fieldInteractions.current.size;
     

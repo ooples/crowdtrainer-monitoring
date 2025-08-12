@@ -388,5 +388,3 @@ export function requirePermission(permission: string) {
     }
   };
 }
-
-export { AuthManager };

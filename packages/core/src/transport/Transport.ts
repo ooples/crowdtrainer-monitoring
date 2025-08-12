@@ -8,8 +8,6 @@ import {
   TransportResponse,
   QueueItem,
   JSONValue,
-  UUID,
-  Timestamp,
   Logger,
   Plugin,
   Storage
@@ -54,7 +52,7 @@ export interface HTTPTransportConfig extends TransportConfig {
 
 export class HTTPTransport implements Transport {
   private config: Required<HTTPTransportConfig>;
-  private queue: QueueItem[] = [];
+  private internalQueue: QueueItem[] = [];
   private isOnline = true;
   private retryTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private isDestroyed = false;
@@ -95,7 +93,7 @@ export class HTTPTransport implements Transport {
     }
 
     if (!this.isOnline && this.config.enableOfflineSupport) {
-      await this.queue(processedData);
+      await this.queueItem(processedData);
       return { status: 'success', message: 'Queued for offline sending' };
     }
 
@@ -104,10 +102,10 @@ export class HTTPTransport implements Transport {
       this.applyAfterSendPlugins(response);
       return response;
     } catch (error) {
-      this.config.logger.error('HTTPTransport: Send failed', error);
+      this.config.logger.error('HTTPTransport: Send failed', error as unknown as JSONValue);
       
       if (this.config.enableOfflineSupport) {
-        await this.queue(processedData);
+        await this.queueItem(processedData);
         return { status: 'success', message: 'Queued after send failure' };
       }
       
@@ -138,7 +136,7 @@ export class HTTPTransport implements Transport {
 
     if (!this.isOnline && this.config.enableOfflineSupport) {
       for (const item of processedItems) {
-        await this.queue(item);
+        await this.queueItem(item);
       }
       return { status: 'success', message: 'Batch queued for offline sending' };
     }
@@ -148,11 +146,11 @@ export class HTTPTransport implements Transport {
       this.applyAfterSendPlugins(response);
       return response;
     } catch (error) {
-      this.config.logger.error('HTTPTransport: Batch send failed', error);
+      this.config.logger.error('HTTPTransport: Batch send failed', error as unknown as JSONValue);
       
       if (this.config.enableOfflineSupport) {
         for (const item of processedItems) {
-          await this.queue(item);
+          await this.queueItem(item);
         }
         return { status: 'success', message: 'Batch queued after send failure' };
       }
@@ -164,7 +162,14 @@ export class HTTPTransport implements Transport {
   /**
    * Queue data for later sending
    */
-  async queue(data: JSONValue, priority: number = 0): Promise<void> {
+  async queue(data: JSONValue, priority?: number): Promise<void> {
+    await this.queueItem(data, priority);
+  }
+
+  /**
+   * Internal queue implementation
+   */
+  private async queueItem(data: JSONValue, priority: number = 0): Promise<void> {
     const item: QueueItem = {
       id: generateId(),
       data,
@@ -173,17 +178,17 @@ export class HTTPTransport implements Transport {
       priority
     };
 
-    this.queue.push(item);
+    this.internalQueue.push(item);
     
     // Sort by priority (lower number = higher priority)
-    this.queue.sort((a, b) => a.priority! - b.priority!);
+    this.internalQueue.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
 
     // Save to storage
     if (this.config.enableOfflineSupport) {
       await this.saveQueueToStorage();
     }
 
-    this.config.logger.debug('HTTPTransport: Item queued', { id: item.id, queueSize: this.queue.length });
+    this.config.logger.debug('HTTPTransport: Item queued', { id: item.id, queueSize: this.internalQueue.length });
   }
 
   /**
@@ -194,7 +199,7 @@ export class HTTPTransport implements Transport {
       return [];
     }
 
-    if (this.queue.length === 0) {
+    if (this.internalQueue.length === 0) {
       return [];
     }
 
@@ -203,8 +208,8 @@ export class HTTPTransport implements Transport {
 
     try {
       // Process queue in batches
-      while (this.queue.length > 0) {
-        const batch = this.queue.splice(0, this.config.batchSize);
+      while (this.internalQueue.length > 0) {
+        const batch = this.internalQueue.splice(0, this.config.batchSize);
         const items = batch.map(item => item.data);
 
         try {
@@ -256,7 +261,7 @@ export class HTTPTransport implements Transport {
    * Get current queue size
    */
   getQueueSize(): number {
-    return this.queue.length;
+    return this.internalQueue.length;
   }
 
   /**
@@ -268,7 +273,7 @@ export class HTTPTransport implements Transport {
     this.retryTimeouts.clear();
     
     // Clear queue
-    this.queue = [];
+    this.internalQueue = [];
     
     // Clear storage
     if (this.config.enableOfflineSupport) {
@@ -495,11 +500,11 @@ export class HTTPTransport implements Transport {
       const queueData = await this.config.storage.getItem('transport_queue');
       if (queueData) {
         const parsedQueue = JSON.parse(queueData) as QueueItem[];
-        this.queue = parsedQueue;
-        this.config.logger.debug(`HTTPTransport: Loaded ${this.queue.length} items from storage`);
+        this.internalQueue = parsedQueue;
+        this.config.logger.debug(`HTTPTransport: Loaded ${this.internalQueue.length} items from storage`);
       }
     } catch (error) {
-      this.config.logger.error('HTTPTransport: Failed to load queue from storage', error);
+      this.config.logger.error('HTTPTransport: Failed to load queue from storage', error as unknown as JSONValue);
     }
   }
 
@@ -508,10 +513,10 @@ export class HTTPTransport implements Transport {
    */
   private async saveQueueToStorage(): Promise<void> {
     try {
-      const queueData = JSON.stringify(this.queue);
+      const queueData = JSON.stringify(this.internalQueue);
       await this.config.storage.setItem('transport_queue', queueData);
     } catch (error) {
-      this.config.logger.error('HTTPTransport: Failed to save queue to storage', error);
+      this.config.logger.error('HTTPTransport: Failed to save queue to storage', error as unknown as JSONValue);
     }
   }
 }

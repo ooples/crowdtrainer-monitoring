@@ -122,10 +122,10 @@ async function start() {
     await server.register(helmet, {
       contentSecurityPolicy: env.HELMET_CSP_ENABLED ? {
         directives: {
-          defaultSrc: [\"'self'\"],
-          scriptSrc: [\"'self'\", \"'unsafe-inline'\"],
-          styleSrc: [\"'self'\", \"'unsafe-inline'\"],
-          imgSrc: [\"'self'\", 'data:', 'https:'],
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
         },
       } : false,
     });

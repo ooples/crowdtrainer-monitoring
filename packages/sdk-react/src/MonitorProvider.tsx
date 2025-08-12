@@ -401,6 +401,10 @@ export const MonitorProvider: React.FC<MonitorProviderProps> = ({ config, childr
         window.removeEventListener('popstate', handleRouteChange);
       };
     }
+    
+    return () => {
+      // No cleanup needed if auto-tracking is disabled
+    };
   }, [config.enableAutoTracking, monitor]);
   
   // Flush on unmount

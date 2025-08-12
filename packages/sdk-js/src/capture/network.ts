@@ -1,4 +1,4 @@
-import type { NetworkCapture, Breadcrumb } from '../types';
+import type { NetworkCaptureData, Breadcrumb } from '../types';
 import { now, isBrowser } from '../utils';
 
 /**
@@ -6,7 +6,7 @@ import { now, isBrowser } from '../utils';
  */
 export class NetworkCapture {
   private isEnabled: boolean = false;
-  private listeners: Array<(request: NetworkCapture) => void> = [];
+  private listeners: Array<(request: NetworkCaptureData) => void> = [];
   private originalFetch?: typeof fetch;
   private originalXHROpen?: typeof XMLHttpRequest.prototype.open;
   private originalXHRSend?: typeof XMLHttpRequest.prototype.send;
@@ -35,12 +35,12 @@ export class NetworkCapture {
   }
 
   /** Add network listener */
-  addListener(listener: (request: NetworkCapture) => void): void {
+  addListener(listener: (request: NetworkCaptureData) => void): void {
     this.listeners.push(listener);
   }
 
   /** Remove network listener */
-  removeListener(listener: (request: NetworkCapture) => void): void {
+  removeListener(listener: (request: NetworkCaptureData) => void): void {
     const index = this.listeners.indexOf(listener);
     if (index > -1) {
       this.listeners.splice(index, 1);
@@ -48,7 +48,7 @@ export class NetworkCapture {
   }
 
   /** Manually capture a network request */
-  captureRequest(request: NetworkCapture): void {
+  captureRequest(request: NetworkCaptureData): void {
     this.notifyListeners(request);
   }
 
@@ -69,7 +69,7 @@ export class NetworkCapture {
           const endTime = now();
           const duration = endTime - startTime;
 
-          const networkCapture: NetworkCapture = {
+          const networkCapture: NetworkCaptureData = {
             url,
             method: method.toUpperCase(),
             status: response.status,
@@ -95,7 +95,7 @@ export class NetworkCapture {
           const endTime = now();
           const duration = endTime - startTime;
 
-          const networkCapture: NetworkCapture = {
+          const networkCapture: NetworkCaptureData = {
             url,
             method: method.toUpperCase(),
             status: 0, // Network error
@@ -113,7 +113,7 @@ export class NetworkCapture {
   private unpatchFetch(): void {
     if (this.originalFetch) {
       window.fetch = this.originalFetch;
-      this.originalFetch = undefined;
+      delete this.originalFetch;
     }
   }
 
@@ -141,7 +141,7 @@ export class NetworkCapture {
         startTime: 0,
       };
 
-      return self.originalXHROpen!.call(this, method, url, async, user, password);
+      return self.originalXHROpen!.call(this, method, url, async ?? true, user, password);
     };
 
     // Patch send method
@@ -163,7 +163,7 @@ export class NetworkCapture {
         const endTime = now();
         const duration = endTime - monitoring.startTime;
 
-        const networkCapture: NetworkCapture = {
+        const networkCapture: NetworkCaptureData = {
           url: monitoring.url,
           method: monitoring.method,
           status: this.status,
@@ -194,12 +194,12 @@ export class NetworkCapture {
   private unpatchXHR(): void {
     if (this.originalXHROpen) {
       XMLHttpRequest.prototype.open = this.originalXHROpen;
-      this.originalXHROpen = undefined;
+      delete this.originalXHROpen;
     }
 
     if (this.originalXHRSend) {
       XMLHttpRequest.prototype.send = this.originalXHRSend;
-      this.originalXHRSend = undefined;
+      delete this.originalXHRSend;
     }
   }
 
@@ -237,7 +237,7 @@ export class NetworkCapture {
   }
 
   /** Notify all listeners of network request */
-  private notifyListeners(request: NetworkCapture): void {
+  private notifyListeners(request: NetworkCaptureData): void {
     this.listeners.forEach(listener => {
       try {
         listener(request);
@@ -259,7 +259,7 @@ export class NetworkCapture {
   }
 
   /** Get statistics for captured requests */
-  getStats(requests: NetworkCapture[]): {
+  getStats(requests: NetworkCaptureData[]): {
     total: number;
     failed: number;
     slow: number;
@@ -274,9 +274,7 @@ export class NetworkCapture {
   }
 
   /** Generate breadcrumb from network request */
-  static toBreadcrumb(request: NetworkCapture): Breadcrumb {
-    const level = request.status >= 400 ? 'error' : 'info';
-    
+  static toBreadcrumb(request: NetworkCaptureData): Breadcrumb {
     return {
       timestamp: request.timestamp,
       type: 'http',

@@ -4,14 +4,11 @@
 
 import { 
   BaseEvent, 
-  EventType, 
   PageViewEvent, 
   ClickEvent, 
   FormSubmitEvent, 
   CustomEvent,
   Context,
-  UUID,
-  Timestamp,
   JSONValue,
   Logger,
   Plugin

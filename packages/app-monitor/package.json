@@ -1,0 +1,32 @@
+{
+  "name": "@app-monitor/core",
+  "version": "1.0.0",
+  "description": "Complete monitoring solution for web applications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "app-monitor": "./bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "node ./scripts/postinstall.js",
+    "start": "node ./bin/cli.js start",
+    "stop": "node ./bin/cli.js stop",
+    "status": "node ./bin/cli.js status"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.6",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "scripts",
+    "templates",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
