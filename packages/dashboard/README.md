@@ -1,17 +1,73 @@
-# Monitoring Dashboard
+# CrowdTrainer Monitoring Dashboard
 
-A beautiful, embeddable monitoring dashboard built with Next.js 14, TypeScript, and Tailwind CSS. Features real-time metrics, customizable branding, and iframe embedding support.
+An advanced monitoring dashboard with progressive disclosure, multiple modes, and real-time event tracking. Built with Next.js 14, TypeScript, and Tailwind CSS.
 
-## ✨ Features
+## ✨ New Features
 
-- **Real-time Monitoring**: Live metrics, events, and alerts
-- **Beautiful UI**: Modern design with glassmorphism effects and Framer Motion animations
-- **Embeddable**: iframe-ready with customizable dimensions and branding
-- **White-label Ready**: Complete theming and branding customization
-- **Multi-source Support**: Connect to multiple data sources and APIs
-- **API Key Management**: Secure access control with granular permissions
-- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
-- **Performance Optimized**: Built for speed with Next.js 14 and optimizations
+### 🎛️ Progressive Mode System
+- **Simple Mode**: Essential metrics only, clean interface for end users
+- **Advanced Mode**: Detailed analytics, filters, and exports for power users
+- **Expert Mode**: All features including debug info and advanced controls for developers
+
+### 🔒 Admin Mode
+- Secure password-protected admin features (password: `admin123`)
+- Visual admin overlay with red border indication
+- Access to sensitive debugging information and system controls
+
+### 📊 Unified Activity Panel
+- Combined events and alerts display in a single, intelligent interface
+- Smart filtering and categorization with real-time updates
+- Mute/unmute categories functionality for noise reduction
+- Progressive enhancement based on selected mode
+
+### 🔔 Smart Notifications
+- Contextual notifications based on system events and health changes
+- Priority-based display with intelligent auto-dismiss
+- Ability to mute specific notification types
+- Different notification limits per mode (Simple: 3, Advanced: 5, Expert: 8)
+
+### ⌨️ Keyboard Shortcuts
+- **Ctrl+1/2/3**: Switch between Simple/Advanced/Expert modes
+- **Ctrl+Shift+A**: Toggle Admin mode (requires password)
+- **Ctrl+F**: Focus search (Expert mode)
+- **Ctrl+Shift+E**: Export data (Advanced/Expert modes)
+- **?**: Show keyboard shortcuts help dialog
+
+### 🎨 Beautiful UI
+- Smooth animations between modes with Framer Motion
+- Glass morphism design with dynamic background effects
+- Responsive layout optimized for all screen sizes
+- Dark theme with carefully crafted color palette
+
+## 📊 Mode Features
+
+| Feature | Simple | Advanced | Expert |
+|---------|---------|----------|--------|
+| Metrics Cards | ✅ | ✅ | ✅ |
+| Unified Activity Panel | ✅ | ✅ | ✅ |
+| Smart Notifications | ✅ (3 max) | ✅ (5 max) | ✅ (8 max) |
+| Mode Switcher | ✅ | ✅ | ✅ |
+| Auto-refresh | ✅ | ✅ | ✅ |
+| Dashboard Filters | ❌ | ✅ | ✅ |
+| Export Data | ❌ | ✅ | ✅ |
+| OAuth Status Panel | ❌ | ✅ | ✅ |
+| Search Functionality | ❌ | ❌ | ✅ |
+| Debug Information | ❌ | ❌ | ✅ |
+| Category Muting | ❌ | ✅ | ✅ |
+| Admin Features | Admin Mode Only | Admin Mode Only | Admin Mode Only |
+
+### Real-time Data Integration
+
+The dashboard connects to CrowdTrainer's monitoring API and displays:
+
+- **System Health**: CPU, memory, disk usage, and overall operational status
+- **User Activity**: Logins, registrations, OAuth events, and user sessions  
+- **API Performance**: Response times, error rates, throughput, and endpoint health
+- **Payment Events**: Stripe transactions, subscription changes, and payment failures
+- **Security Events**: Failed logins, rate limiting alerts, and security violations
+- **Infrastructure**: Vercel deployments, edge function metrics, and CDN performance
+
+When the monitoring API is unavailable, the dashboard gracefully falls back to demo data with real-time simulation to maintain functionality.
 
 ## 🚀 Quick Start
 

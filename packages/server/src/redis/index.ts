@@ -1,5 +1,144 @@
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 import { RedisConfig } from '../types';
+
+// Mock Redis implementation for development
+class MockRedisManager {
+  private data: Map<string, any> = new Map();
+  private subscribers: Map<string, Function[]> = new Map();
+  
+  async connect(): Promise<void> {
+    console.log('Mock Redis connected');
+  }
+  
+  async disconnect(): Promise<void> {
+    console.log('Mock Redis disconnected');
+  }
+  
+  async get(key: string): Promise<string | null> {
+    return this.data.get(key) || null;
+  }
+  
+  async set(key: string, value: string, ttl?: number): Promise<'OK'> {
+    this.data.set(key, value);
+    if (ttl) {
+      setTimeout(() => this.data.delete(key), ttl * 1000);
+    }
+    return 'OK';
+  }
+  
+  async del(...keys: string[]): Promise<number> {
+    let count = 0;
+    for (const key of keys) {
+      if (this.data.delete(key)) count++;
+    }
+    return count;
+  }
+  
+  async exists(...keys: string[]): Promise<number> {
+    return keys.filter(k => this.data.has(k)).length;
+  }
+  
+  async incr(key: string): Promise<number> {
+    const val = parseInt(this.data.get(key) || '0') + 1;
+    this.data.set(key, val.toString());
+    return val;
+  }
+  
+  async expire(key: string, seconds: number): Promise<number> {
+    if (this.data.has(key)) {
+      setTimeout(() => this.data.delete(key), seconds * 1000);
+      return 1;
+    }
+    return 0;
+  }
+  
+  async publish(channel: string, message: any): Promise<number> {
+    const callbacks = this.subscribers.get(channel) || [];
+    callbacks.forEach(cb => cb(message));
+    return callbacks.length;
+  }
+  
+  async subscribe(channel: string, callback: Function): Promise<void> {
+    if (!this.subscribers.has(channel)) {
+      this.subscribers.set(channel, []);
+    }
+    this.subscribers.get(channel)!.push(callback);
+  }
+  
+  async unsubscribe(channel: string, callback?: Function): Promise<void> {
+    if (!callback) {
+      this.subscribers.delete(channel);
+    } else {
+      const callbacks = this.subscribers.get(channel);
+      if (callbacks) {
+        const index = callbacks.indexOf(callback);
+        if (index > -1) callbacks.splice(index, 1);
+      }
+    }
+  }
+  
+  async ping(): Promise<'PONG'> {
+    return 'PONG';
+  }
+  
+  async flushall(): Promise<'OK'> {
+    this.data.clear();
+    return 'OK';
+  }
+
+  // JSON operations for mock
+  async getJSON<T>(key: string): Promise<T | null> {
+    const value = this.data.get(key);
+    if (!value) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  async setJSON(key: string, value: any, ttl?: number): Promise<'OK'> {
+    const jsonValue = JSON.stringify(value);
+    return this.set(key, jsonValue, ttl);
+  }
+
+  // Metrics operations for mock
+  async incrementMetric(key: string, value: number = 1): Promise<number> {
+    const current = parseInt(this.data.get(key) || '0');
+    const newValue = current + value;
+    this.data.set(key, newValue.toString());
+    return newValue;
+  }
+
+  async getMetricValue(metric: string): Promise<number> {
+    const value = this.data.get(`metric:${metric}`);
+    return value ? parseInt(value, 10) : 0;
+  }
+
+  // Additional Redis-like operations that might be needed
+  get client() {
+    return {
+      keys: async (pattern: string) => {
+        const keys = Array.from(this.data.keys());
+        if (pattern === '*') return keys;
+        // Simple pattern matching for common cases
+        if (pattern.endsWith('*')) {
+          const prefix = pattern.slice(0, -1);
+          return keys.filter(key => key.startsWith(prefix));
+        }
+        return keys.filter(key => key === pattern);
+      },
+      del: async (...keys: string[]) => {
+        let count = 0;
+        for (const key of keys) {
+          if (this.data.delete(key)) count++;
+        }
+        return count;
+      }
+    };
+  }
+}
+
 
 export class RedisManager {
   private client: Redis;
@@ -9,22 +148,16 @@ export class RedisManager {
   private eventCallbacks: Map<string, Function[]> = new Map();
 
   constructor(config: RedisConfig) {
-    const redisOptions: Redis.RedisOptions = {
+    const redisOptions: RedisOptions = {
       host: config.host,
       port: config.port,
-      password: config.password,
+      ...(config.password ? { password: config.password } : {}),
       db: config.db,
-      retryDelayOnFailover: config.retryDelayOnFailover,
       enableReadyCheck: config.enableReadyCheck,
       maxRetriesPerRequest: config.maxRetriesPerRequest,
       lazyConnect: true,
       connectTimeout: 10000,
       commandTimeout: 5000,
-      retryDelayOnClusterDown: 300,
-      retryDelayOnReconnect: function (times: number) {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
     };
 
     this.client = new Redis(redisOptions);
@@ -55,7 +188,7 @@ export class RedisManager {
       this.isConnected = false;
     });
 
-    this.client.on('reconnecting', (ms) => {
+    this.client.on('reconnecting', (ms: number) => {
       console.log(`Redis client reconnecting in ${ms}ms`);
     });
 

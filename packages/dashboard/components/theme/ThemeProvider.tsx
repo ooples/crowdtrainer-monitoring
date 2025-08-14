@@ -120,7 +120,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 300,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -177,7 +177,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 250,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -234,7 +234,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 400,
-      easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
+      easing: 'easeOut',
     },
   },
   {
@@ -291,7 +291,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 350,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -348,7 +348,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 300,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -405,7 +405,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 350,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -462,7 +462,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 200,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -519,7 +519,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 300,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -633,7 +633,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 200,
-      easing: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+      easing: 'backOut',
     },
   },
   {
@@ -690,7 +690,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 400,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
   {
@@ -747,7 +747,7 @@ const defaultThemes: Theme[] = [
     animations: {
       enabled: true,
       duration: 300,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easing: 'easeInOut',
     },
   },
 ];

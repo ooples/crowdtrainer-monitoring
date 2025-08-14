@@ -16,7 +16,8 @@ export class ApiClient {
   private headers: Record<string, string>;
 
   constructor(config: Pick<DashboardConfig, 'apiUrl' | 'apiKey'>) {
-    this.baseUrl = config.apiUrl;
+    // Ensure baseUrl doesn't have /api suffix since we add it in endpoints
+    this.baseUrl = config.apiUrl.replace(/\/api\/?$/, '');
     this.apiKey = config.apiKey;
     this.headers = {
       'Content-Type': 'application/json',
@@ -29,7 +30,9 @@ export class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
+      // Use absolute URL directly to bypass Next.js routing
       const url = `${this.baseUrl}${endpoint}`;
+      console.log('Making request to:', url);
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -59,11 +62,11 @@ export class ApiClient {
   }
 
   async getMetrics(): Promise<MetricsResponse> {
-    return this.request<SystemMetrics>('/monitor/realtime');
+    return this.request<SystemMetrics>('/api/v1/dashboard/realtime');
   }
 
   async getAlerts(): Promise<AlertsResponse> {
-    const response = await this.request<{ alerts: Alert[] }>('/monitor/alerts');
+    const response = await this.request<{ alerts: Alert[] }>('/api/v1/alerts');
     return response;
   }
 
@@ -92,38 +95,38 @@ export class ApiClient {
     }
 
     const query = searchParams.toString();
-    const endpoint = `/monitor/events${query ? `?${query}` : ''}`;
+    const endpoint = `/api/v1/events${query ? `?${query}` : ''}`;
     
     return this.request<{ events: Event[] }>(endpoint);
   }
 
   async acknowledgeAlert(alertId: string): Promise<ApiResponse<void>> {
-    return this.request(`/monitor/alerts/${alertId}/acknowledge`, {
+    return this.request(`/api/v1/alerts/${alertId}/acknowledge`, {
       method: 'POST',
     });
   }
 
   async testConnection(): Promise<ApiResponse<{ status: string }>> {
-    return this.request('/monitor/health');
+    return this.request('/health');
   }
 
   // OAuth specific endpoints
   async getOAuthStatus(): Promise<ApiResponse<Record<string, string>>> {
-    return this.request('/monitor/oauth/status');
+    return this.request('/api/v1/oauth/status');
   }
 
   async getOAuthAnalytics(): Promise<ApiResponse<any>> {
-    return this.request('/monitor/oauth/analytics');
+    return this.request('/api/v1/oauth/analytics');
   }
 
   // Performance metrics
   async getPerformanceMetrics(): Promise<ApiResponse<any>> {
-    return this.request('/monitor/performance');
+    return this.request('/api/v1/metrics/performance');
   }
 
   // System health check
   async getSystemHealth(): Promise<ApiResponse<any>> {
-    return this.request('/monitor/system/health');
+    return this.request('/api/v1/admin/health');
   }
 }
 
@@ -219,12 +222,21 @@ export class MultiSourceApiClient {
 
 // Default API client factory
 export function createApiClient(config?: Partial<DashboardConfig>): ApiClient {
-  const defaultConfig: Pick<DashboardConfig, 'apiUrl' | 'apiKey'> = {
-    apiUrl: process.env.NEXT_PUBLIC_MONITORING_API_URL || '/api',
-    apiKey: process.env.NEXT_PUBLIC_MONITORING_API_KEY,
-  };
-
-  return new ApiClient({ ...defaultConfig, ...config });
+  // Use the config passed in, which should come from defaultConfig in config.ts
+  // The config.ts file properly handles environment variables
+  if (!config?.apiUrl) {
+    console.error('API URL not provided to createApiClient, using fallback');
+    // Fallback but this shouldn't happen if config.ts is working
+    return new ApiClient({
+      apiUrl: 'http://localhost:4001',
+      apiKey: config?.apiKey,
+    });
+  }
+  
+  return new ApiClient({
+    apiUrl: config.apiUrl,
+    apiKey: config.apiKey,
+  });
 }
 
 // Webhook client for real-time updates

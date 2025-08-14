@@ -90,6 +90,40 @@
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
+
+  /* Modern button styles */
+  .modern-button {
+    @apply relative overflow-hidden bg-gradient-to-r transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .modern-button::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .modern-button:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Improved focus styles */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-gray-900;
+  }
+
+  /* Modern card styles */
+  .modern-card {
+    @apply glass rounded-xl p-6 relative overflow-hidden;
+  }
+
+  .modern-card::before {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  }
+
+  .modern-card:hover::before {
+    @apply opacity-100;
+  }
 }
 
 /* Embed mode specific styles */

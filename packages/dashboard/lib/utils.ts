@@ -26,16 +26,24 @@ export function formatTimeAgo(timestamp: string): string {
   }
 }
 
-export function formatMetricValue(value: number, type: 'number' | 'percentage' | 'ms' | 'bytes' = 'number'): string {
+export function formatMetricValue(value: number | string | undefined | null, type: 'number' | 'percentage' | 'ms' | 'bytes' = 'number'): string {
+  // Handle undefined or null values
+  if (value == null) {
+    return '0';
+  }
+  
+  // Convert to number if it's a string
+  const numericValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+  
   switch (type) {
     case 'percentage':
-      return `${value.toFixed(1)}%`;
+      return `${numericValue.toFixed(1)}%`;
     case 'ms':
-      return `${value}ms`;
+      return `${numericValue}ms`;
     case 'bytes':
-      return formatBytes(value);
+      return formatBytes(numericValue);
     default:
-      return value.toLocaleString();
+      return numericValue.toLocaleString();
   }
 }
 

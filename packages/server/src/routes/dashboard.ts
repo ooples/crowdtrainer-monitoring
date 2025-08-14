@@ -1,9 +1,29 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply, RouteGenericInterface } from 'fastify';
 import { z } from 'zod';
 import { getDatabase } from '../database';
 import { getRedis } from '../redis';
 import { requirePermission } from '../middleware';
-import { DashboardQuery, DashboardQuerySchema } from '../types';
+// Dashboard route interfaces
+interface OverviewQueryInterface extends RouteGenericInterface {
+  Querystring: z.infer<typeof OverviewStatsSchema.shape.query>;
+}
+
+interface TimeSeriesQueryInterface extends RouteGenericInterface {
+  Querystring: z.infer<typeof TimeSeriesSchema.shape.query>;
+}
+
+interface TopListParamsInterface extends RouteGenericInterface {
+  Params: { type: 'errors' | 'slow_requests' | 'traffic_sources' | 'user_agents' };
+  Querystring: Omit<z.infer<typeof TopListSchema.shape.query>, 'type'>;
+}
+
+interface HeatmapQueryInterface extends RouteGenericInterface {
+  Querystring: z.infer<typeof HeatmapSchema.shape.query>;
+}
+
+interface CreateWidgetInterface extends RouteGenericInterface {
+  Body: { name: string; type: string; query: object; config?: object };
+}
 
 // Extended dashboard query schemas
 const OverviewStatsSchema = z.object({
@@ -54,7 +74,13 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       description: 'Get dashboard overview statistics',
       tags: ['dashboard'],
       security: [{ apiKey: [] }],
-      querystring: OverviewStatsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -94,9 +120,9 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<OverviewQueryInterface>, reply: FastifyReply) => {
     try {
-      const { query } = OverviewStatsSchema.parse(request);
+      const query = request.query;
 
       // Default to last 24 hours if no time range specified
       const endTime = query.endTime || new Date().toISOString();
@@ -199,7 +225,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       reply.send({
         summary: currentStats,
         trends,
-        topSources: topSourcesResult.rows.map(row => ({
+        topSources: topSourcesResult.rows.map((row: any) => ({
           source: row.source,
           eventCount: parseInt(row.event_count),
           metricCount: parseInt(row.metric_count),
@@ -207,7 +233,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       });
 
     } catch (error) {
-      request.log.error('Error getting dashboard overview:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get dashboard overview',
@@ -221,7 +247,18 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       description: 'Get time series data for dashboard charts',
       tags: ['dashboard'],
       security: [{ apiKey: [] }],
-      querystring: TimeSeriesSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          metrics: { type: 'array', items: { type: 'string' }, minItems: 1 },
+          sources: { type: 'array', items: { type: 'string' } },
+          interval: { type: 'string', enum: ['1m', '5m', '15m', '1h', '6h', '1d'], default: '5m' },
+          aggregation: { type: 'string', enum: ['avg', 'sum', 'min', 'max', 'count'], default: 'avg' }
+        },
+        required: ['startTime', 'endTime', 'metrics']
+      },
       response: {
         200: {
           type: 'object',
@@ -251,9 +288,9 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<TimeSeriesQueryInterface>, reply: FastifyReply) => {
     try {
-      const { query } = TimeSeriesSchema.parse(request);
+      const query = request.query;
 
       // Map interval to PostgreSQL time_bucket interval
       const intervalMap: Record<string, string> = {
@@ -337,7 +374,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       reply.send({ series });
 
     } catch (error) {
-      request.log.error('Error getting time series data:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get time series data',
@@ -358,7 +395,14 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
         },
         required: ['type'],
       },
-      querystring: TopListSchema.shape.query.omit({ type: true }),
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 10 }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -380,12 +424,10 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest<{ 
-    Params: { type: 'errors' | 'slow_requests' | 'traffic_sources' | 'user_agents' } 
-  }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<TopListParamsInterface>, reply: FastifyReply) => {
     try {
       const { type } = request.params;
-      const query = request.query as { startTime?: string; endTime?: string; limit?: number };
+      const query = request.query;
       
       // Default to last 24 hours
       const endTime = query.endTime || new Date().toISOString();
@@ -483,7 +525,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       reply.send({ items });
 
     } catch (error) {
-      request.log.error('Error getting top list:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get top list',
@@ -497,7 +539,18 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       description: 'Get heatmap data for visualization',
       tags: ['dashboard'],
       security: [{ apiKey: [] }],
-      querystring: HeatmapSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          metric: { type: 'string' },
+          source: { type: 'string' },
+          xAxis: { type: 'string', enum: ['hour', 'day', 'week'], default: 'day' },
+          yAxis: { type: 'string' }
+        },
+        required: ['startTime', 'endTime', 'metric', 'yAxis']
+      },
       response: {
         200: {
           type: 'object',
@@ -520,9 +573,9 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<HeatmapQueryInterface>, reply: FastifyReply) => {
     try {
-      const { query } = HeatmapSchema.parse(request);
+      const query = request.query;
 
       // Map xAxis to PostgreSQL date_trunc
       const xAxisMap = {
@@ -555,15 +608,15 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       `, params);
 
       // Transform data for heatmap
-      const data = result.rows.map(row => ({
+      const data = result.rows.map((row: any) => ({
         x: row.x_value,
         y: row.y_value,
         value: parseFloat(row.value) || 0,
       }));
 
       // Extract unique labels for axes
-      const xLabels = [...new Set(data.map(d => d.x))].sort();
-      const yLabels = [...new Set(data.map(d => d.y))].sort();
+      const xLabels = [...new Set(data.map((d: any) => d.x))].sort();
+      const yLabels = [...new Set(data.map((d: any) => d.y))].sort();
 
       reply.send({
         data,
@@ -572,7 +625,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       });
 
     } catch (error) {
-      request.log.error('Error getting heatmap data:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get heatmap data',
@@ -609,7 +662,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       // Get recent metrics from Redis (faster than database)
       const [eventsPerSec, metricsPerSec, errorRate] = await Promise.all([
@@ -650,7 +703,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       });
 
     } catch (error) {
-      request.log.error('Error getting real-time data:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get real-time data',
@@ -685,14 +738,9 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<CreateWidgetInterface>, reply: FastifyReply) => {
     try {
-      const body = request.body as {
-        name: string;
-        type: string;
-        query: object;
-        config?: object;
-      };
+      const body = request.body;
 
       // Store widget configuration in Redis
       const widgetId = `widget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -703,7 +751,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
         query: body.query,
         config: body.config || {},
         createdAt: new Date().toISOString(),
-        createdBy: request.apiKey?.name || 'unknown',
+        createdBy: (request as any).apiKey?.name || 'unknown',
       };
 
       await redis.setJSON(`dashboard:widget:${widgetId}`, widget);
@@ -714,7 +762,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       });
 
     } catch (error) {
-      request.log.error('Error creating widget:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to create widget',
@@ -750,22 +798,22 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       // Get widget keys from Redis
-      const keys = await redis.client.keys('dashboard:widget:*');
+      const keys = await (redis as any).client.keys('dashboard:widget:*');
       const widgets = [];
 
       for (const key of keys) {
         const widget = await redis.getJSON(key);
-        if (widget) {
+        if (widget && typeof widget === 'object') {
           // Don't expose the full query in list view
           widgets.push({
-            id: widget.id,
-            name: widget.name,
-            type: widget.type,
-            config: widget.config,
-            createdAt: widget.createdAt,
+            id: (widget as any).id,
+            name: (widget as any).name,
+            type: (widget as any).type,
+            config: (widget as any).config,
+            createdAt: (widget as any).createdAt,
           });
         }
       }
@@ -773,7 +821,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
       reply.send({ widgets });
 
     } catch (error) {
-      request.log.error('Error getting widgets:', error);
+      fastify.log.error({ error }, 'Error in dashboard route');
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get widgets',

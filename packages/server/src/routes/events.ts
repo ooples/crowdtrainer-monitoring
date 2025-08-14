@@ -1,10 +1,32 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply, RouteGenericInterface } from 'fastify';
 import { z } from 'zod';
 import { getDatabase } from '../database';
 import { getRedis } from '../redis';
 import { getWebSocketManager } from '../websocket';
 import { requirePermission } from '../middleware';
-import { Event, EventSchema, EventType } from '../types';
+import { Event, EventSchema } from '../types';
+
+
+// Request type interfaces
+interface CreateEventRequest extends RouteGenericInterface {
+  Body: z.infer<typeof CreateEventSchema.shape.body>;
+}
+
+interface BulkCreateEventsRequest extends RouteGenericInterface {
+  Body: z.infer<typeof BulkCreateEventsSchema.shape.body>;
+}
+
+interface QueryEventsRequest extends RouteGenericInterface {
+  Querystring: z.infer<typeof QueryEventsSchema.shape.query>;
+}
+
+interface EventByIdRequest extends RouteGenericInterface {
+  Params: { id: string };
+}
+
+interface EventStatsRequest extends RouteGenericInterface {
+  Querystring: z.infer<typeof EventStatsSchema.shape.query>;
+}
 
 // Request schemas
 const CreateEventSchema = z.object({
@@ -52,12 +74,30 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   const redis = getRedis();
 
   // Create single event
-  fastify.post('/', {
+  fastify.post<CreateEventRequest>('/', {
     schema: {
       description: 'Create a new event',
       tags: ['events'],
       security: [{ apiKey: [] }],
-      body: CreateEventSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['error', 'warning', 'info', 'debug', 'performance', 'user_action', 'system', 'security', 'business'] },
+          level: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
+          source: { type: 'string' },
+          message: { type: 'string' },
+          metadata: { type: 'object', additionalProperties: true },
+          userId: { type: 'string' },
+          sessionId: { type: 'string' },
+          requestId: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } },
+          stack: { type: 'string' },
+          url: { type: 'string' },
+          userAgent: { type: 'string' },
+          ip: { type: 'string' }
+        },
+        required: ['type', 'source', 'message']
+      },
       response: {
         201: {
           type: 'object',
@@ -74,9 +114,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<CreateEventRequest>, reply: FastifyReply) => {
     try {
       const { body } = CreateEventSchema.parse(request);
       
@@ -142,7 +182,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error creating event:', error);
+      request.log.error({ error }, "Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -160,12 +200,40 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Create multiple events (bulk)
-  fastify.post('/bulk', {
+  fastify.post<BulkCreateEventsRequest>('/bulk', {
     schema: {
       description: 'Create multiple events in bulk',
       tags: ['events'],
       security: [{ apiKey: [] }],
-      body: BulkCreateEventsSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          events: {
+            type: 'array',
+            maxItems: 1000,
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['error', 'warning', 'info', 'debug', 'performance', 'user_action', 'system', 'security', 'business'] },
+                level: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
+                source: { type: 'string' },
+                message: { type: 'string' },
+                metadata: { type: 'object', additionalProperties: true },
+                userId: { type: 'string' },
+                sessionId: { type: 'string' },
+                requestId: { type: 'string' },
+                tags: { type: 'array', items: { type: 'string' } },
+                stack: { type: 'string' },
+                url: { type: 'string' },
+                userAgent: { type: 'string' },
+                ip: { type: 'string' }
+              },
+              required: ['type', 'source', 'message']
+            }
+          }
+        },
+        required: ['events']
+      },
       response: {
         201: {
           type: 'object',
@@ -175,9 +243,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<BulkCreateEventsRequest>, reply: FastifyReply) => {
     try {
       const { body } = BulkCreateEventsSchema.parse(request);
       
@@ -250,7 +318,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error creating bulk events:', error);
+      request.log.error({ error }, "Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -268,12 +336,30 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Query events
-  fastify.get('/', {
+  fastify.get<QueryEventsRequest>('/', {
     schema: {
       description: 'Query events with filtering and pagination',
       tags: ['events'],
       security: [{ apiKey: [] }],
-      querystring: QueryEventsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          type: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          level: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          source: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          userId: { type: 'string' },
+          sessionId: { type: 'string' },
+          requestId: { type: 'string' },
+          tags: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          search: { type: 'string' },
+          limit: { type: 'number', minimum: 1, maximum: 10000, default: 100 },
+          offset: { type: 'number', minimum: 0, default: 0 },
+          orderBy: { type: 'string', enum: ['timestamp', 'level', 'type', 'source'], default: 'timestamp' },
+          order: { type: 'string', enum: ['asc', 'desc'], default: 'desc' }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -308,9 +394,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<QueryEventsRequest>, reply: FastifyReply) => {
     try {
       const { query } = QueryEventsSchema.parse(request);
 
@@ -403,7 +489,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error querying events:', error);
+      request.log.error({ error }, "Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -421,7 +507,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Get event by ID
-  fastify.get('/:id', {
+  fastify.get<EventByIdRequest>('/:id', {
     schema: {
       description: 'Get event by ID',
       tags: ['events'],
@@ -454,9 +540,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<EventByIdRequest>, reply: FastifyReply) => {
     try {
       const result = await db.query(`
         SELECT 
@@ -476,7 +562,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       reply.send(result.rows[0]);
 
     } catch (error) {
-      request.log.error('Error getting event:', error);
+      request.log.error({ error }, "Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get event',
@@ -485,12 +571,22 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Get event statistics
-  fastify.get('/stats', {
+  fastify.get<EventStatsRequest>('/stats', {
     schema: {
       description: 'Get event statistics',
       tags: ['events'],
       security: [{ apiKey: [] }],
-      querystring: EventStatsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          groupBy: { type: 'string', enum: ['hour', 'day', 'week', 'month'], default: 'day' },
+          type: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          level: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          source: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -511,9 +607,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<EventStatsRequest>, reply: FastifyReply) => {
     try {
       const { query } = EventStatsSchema.parse(request);
 
@@ -576,7 +672,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
         LIMIT 100
       `, params);
 
-      const stats = result.rows.map(row => ({
+      const stats = result.rows.map((row: any) => ({
         period: row.period,
         total: parseInt(row.total),
         by_type: {
@@ -595,7 +691,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       reply.send({ stats });
 
     } catch (error) {
-      request.log.error('Error getting event statistics:', error);
+      request.log.error({ error }, "Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get event statistics',
@@ -604,7 +700,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Delete event (admin only)
-  fastify.delete('/:id', {
+  fastify.delete<EventByIdRequest>('/:id', {
     schema: {
       description: 'Delete event by ID (admin only)',
       tags: ['events'],
@@ -631,9 +727,9 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('admin')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<EventByIdRequest>, reply: FastifyReply) => {
     try {
       const result = await db.query('DELETE FROM events WHERE id = $1', [request.params.id]);
 
@@ -650,7 +746,7 @@ export default async function eventsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error deleting event:', error);
+      request.log.error({ error }, "Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to delete event',

@@ -1,54 +1,37 @@
-import { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { getAuthManager, authenticateRequest } from '../auth';
 import { getRedis } from '../redis';
 
-// Enhanced request interface
-interface EnhancedRequest extends FastifyRequest {
-  startTime?: number;
-  requestId?: string;
-  rateLimitInfo?: {
-    limit: number;
-    remaining: number;
-    resetTime: Date;
-  };
-}
-
 // Request timing middleware
 export async function requestTimingMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  _reply: FastifyReply
 ): Promise<void> {
   request.startTime = Date.now();
-  done();
 }
 
 // Request ID middleware
 export async function requestIdMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  reply: FastifyReply
 ): Promise<void> {
-  const requestId = request.headers['x-request-id'] as string || 
-                   `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const requestId = (request.headers['x-request-id'] as string) || 
+                   `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   
   request.requestId = requestId;
   reply.header('X-Request-ID', requestId);
-  done();
 }
 
 // Authentication middleware (wrapper for the auth module)
 export async function authMiddleware(
   request: FastifyRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  reply: FastifyReply
 ): Promise<void> {
   try {
     await authenticateRequest(request, reply);
     if (reply.sent) return; // Response already sent (authentication failed)
-    done();
   } catch (error) {
-    request.log.error('Authentication error:', error);
+    (request.log as any).error({ error: error instanceof Error ? error.message : String(error) }, 'Authentication error');
     reply.code(500).send({
       error: 'Internal Server Error',
       message: 'Authentication service error',
@@ -58,13 +41,12 @@ export async function authMiddleware(
 
 // Rate limiting middleware
 export async function rateLimitMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  reply: FastifyReply
 ): Promise<void> {
   // Skip rate limiting for health checks and docs
-  if (request.url === '/health' || request.url.startsWith('/docs')) {
-    return done();
+  if (request.url === '/health' || request.url?.startsWith('/docs')) {
+    return;
   }
 
   try {
@@ -73,7 +55,7 @@ export async function rateLimitMiddleware(
     
     if (request.apiKey) {
       // Use API key specific rate limiting
-      const rateLimitResult = await auth.checkRateLimit(request.apiKey, request.url);
+      const rateLimitResult = await auth.checkRateLimit(request.apiKey, request.url || '');
       
       if (!rateLimitResult.allowed) {
         reply.code(429).send({
@@ -96,7 +78,7 @@ export async function rateLimitMiddleware(
       reply.header('X-RateLimit-Reset', rateLimitResult.resetTime);
     } else {
       // IP-based rate limiting for unauthenticated requests
-      const clientIp = request.ip;
+      const clientIp = request.ip || 'unknown';
       const rateLimitKey = `ratelimit:ip:${clientIp}`;
       const limit = 100; // 100 requests per hour for IP
       const window = 3600 * 1000; // 1 hour
@@ -113,11 +95,10 @@ export async function rateLimitMiddleware(
       }
     }
     
-    done();
+    // done(); // Removed - done is not defined in this scope
   } catch (error) {
-    request.log.error('Rate limiting error:', error);
+    (request.log as any).error({ error: error instanceof Error ? error.message : String(error) }, 'Rate limiting error');
     // On error, allow the request but log the issue
-    done();
   }
 }
 
@@ -125,8 +106,7 @@ export async function rateLimitMiddleware(
 export function validateRequest(schema: any) {
   return async (
     request: FastifyRequest,
-    reply: FastifyReply,
-    done: HookHandlerDoneFunction
+    reply: FastifyReply
   ): Promise<void> => {
     try {
       if (schema.body && request.body) {
@@ -140,8 +120,6 @@ export function validateRequest(schema: any) {
       if (schema.params && request.params) {
         schema.params.parse(request.params);
       }
-      
-      done();
     } catch (error) {
       reply.code(400).send({
         error: 'Validation Error',
@@ -153,11 +131,10 @@ export function validateRequest(schema: any) {
 }
 
 // Permission checking middleware
-export function requirePermission(permission: string) {
+export function requirePermission(permission: 'read' | 'write' | 'admin') {
   return async (
     request: FastifyRequest,
-    reply: FastifyReply,
-    done: HookHandlerDoneFunction
+    reply: FastifyReply
   ): Promise<void> => {
     if (!request.apiKey) {
       reply.code(401).send({
@@ -175,8 +152,6 @@ export function requirePermission(permission: string) {
       });
       return;
     }
-    
-    done();
   };
 }
 
@@ -184,8 +159,7 @@ export function requirePermission(permission: string) {
 export function requireContentType(contentType: string) {
   return async (
     request: FastifyRequest,
-    reply: FastifyReply,
-    done: HookHandlerDoneFunction
+    reply: FastifyReply
   ): Promise<void> => {
     const requestContentType = request.headers['content-type'];
     
@@ -196,16 +170,13 @@ export function requireContentType(contentType: string) {
       });
       return;
     }
-    
-    done();
   };
 }
 
 // Response headers middleware
 export async function responseHeadersMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  reply: FastifyReply
 ): Promise<void> {
   // Security headers (additional to Helmet)
   reply.header('X-Content-Type-Options', 'nosniff');
@@ -217,24 +188,21 @@ export async function responseHeadersMiddleware(
   
   // Response timing
   reply.header('X-Response-Time', `${Date.now() - (request.startTime || Date.now())}ms`);
-  
-  done();
 }
 
 // Error handling middleware
 export async function errorHandlingMiddleware(
   error: Error,
-  request: EnhancedRequest,
+  request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  request.log.error('Request error:', {
+  (request.log as any).error({
     error: error.message,
     stack: error.stack,
     requestId: request.requestId,
     url: request.url,
-    method: request.method,
-    headers: request.headers,
-  });
+    method: request.method
+  }, 'Request error');
 
   // Log to Redis for monitoring
   try {
@@ -253,7 +221,7 @@ export async function errorHandlingMiddleware(
       timestamp: new Date().toISOString(),
     });
   } catch (redisError) {
-    request.log.error('Failed to log error to Redis:', redisError);
+    (request.log as any).error({ error: redisError instanceof Error ? redisError.message : String(redisError) }, 'Failed to log error to Redis');
   }
 
   // Determine error type and response
@@ -303,72 +271,44 @@ export async function errorHandlingMiddleware(
 
 // Request logging middleware
 export async function requestLoggingMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  _reply: FastifyReply
 ): Promise<void> {
   const startTime = Date.now();
   
-  request.log.info('Request started', {
+  (request.log as any).info({
     requestId: request.requestId,
     method: request.method,
     url: request.url,
     userAgent: request.headers['user-agent'],
     ip: request.ip,
-    apiKey: request.apiKey ? `${request.apiKey.name} (${request.apiKey.id?.substring(0, 8)}...)` : 'none',
-  });
+    apiKey: request.apiKey ? `${request.apiKey.name} (${request.apiKey.id?.substring(0, 8)}...)` : 'none'
+  }, 'Request started');
 
-  // Log response when it's sent
-  reply.addHook('onSend', async (request, reply, payload) => {
-    const duration = Date.now() - startTime;
-    
-    request.log.info('Request completed', {
-      requestId: request.requestId,
-      statusCode: reply.statusCode,
-      duration,
-      contentLength: payload ? payload.length : 0,
-    });
-
-    // Update server statistics
-    if (request.server.stats) {
-      request.server.stats.averageResponseTime = 
-        (request.server.stats.averageResponseTime + duration) / 2;
-      
-      if (reply.statusCode >= 400) {
-        request.server.stats.errorRate = 
-          (request.server.stats.errorRate + 1) / 2;
-      }
-    }
-
-    return payload;
-  });
-  
-  done();
+  // Store response logging info for later use in onResponse hook
+  request.loggingStartTime = startTime;
 }
 
 // Health check middleware to update server stats
 export async function healthCheckMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  _reply: FastifyReply
 ): Promise<void> {
   if (request.url === '/health' || request.url === '/stats') {
     // Update server statistics
-    if (request.server.stats) {
+    if (request.server?.stats) {
       request.server.stats.activeConnections = request.server.wsClients?.size || 0;
       request.server.stats.memoryUsage = process.memoryUsage();
       request.server.stats.cpuUsage = process.cpuUsage();
     }
   }
-  
-  done();
 }
 
 // WebSocket connection middleware
 export function websocketConnectionMiddleware() {
   return async (connection: any, request: FastifyRequest): Promise<void> => {
     const redis = getRedis();
-    const connectionId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const connectionId = `ws_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     
     // Store connection metadata
     await redis.addWebSocketConnection(connectionId, {
@@ -388,46 +328,13 @@ export function websocketConnectionMiddleware() {
 
 // Metrics collection middleware
 export async function metricsMiddleware(
-  request: EnhancedRequest,
-  reply: FastifyReply,
-  done: HookHandlerDoneFunction
+  request: FastifyRequest,
+  _reply: FastifyReply
 ): Promise<void> {
   const startTime = Date.now();
   
-  reply.addHook('onSend', async (request, reply, payload) => {
-    try {
-      const redis = getRedis();
-      const duration = Date.now() - startTime;
-      
-      // Collect request metrics
-      await redis.incrementMetric('requests_total');
-      await redis.incrementMetric(`requests_by_status_${reply.statusCode}`);
-      await redis.incrementMetric(`requests_by_method_${request.method.toLowerCase()}`);
-      
-      // Track response times
-      await redis.queueEvent({
-        type: 'performance',
-        level: 'info',
-        source: 'api-server',
-        message: 'Request completed',
-        metadata: {
-          method: request.method,
-          url: request.url,
-          statusCode: reply.statusCode,
-          duration,
-          contentLength: payload ? payload.length : 0,
-        },
-        timestamp: new Date().toISOString(),
-      });
-
-    } catch (error) {
-      request.log.error('Metrics collection error:', error);
-    }
-
-    return payload;
-  });
-  
-  done();
+  // Store metrics info for later use in onResponse hook
+  request.metricsStartTime = startTime;
 }
 
 // Batch request processing middleware for high-volume endpoints
@@ -449,7 +356,7 @@ export function batchProcessingMiddleware(batchSize: number = 100) {
     
     try {
       // Process all requests in the batch
-      await Promise.all(batch.map(async ({ request, reply, resolve, reject }) => {
+      await Promise.all(batch.map(async ({ request: _request, reply: _reply, resolve, reject }) => {
         try {
           // Your batch processing logic here
           resolve();
@@ -471,14 +378,79 @@ export function batchProcessingMiddleware(batchSize: number = 100) {
 
   return async (
     request: FastifyRequest,
-    reply: FastifyReply,
-    done: HookHandlerDoneFunction
+    reply: FastifyReply
   ): Promise<void> => {
     return new Promise((resolve, reject) => {
       requestQueue.push({ request, reply, resolve, reject });
       processBatch();
-    }).then(() => done()).catch(done);
+    });
   };
+}
+
+// Response logging hook for request completion
+export async function onResponseLoggingHook(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (request.loggingStartTime) {
+    const duration = Date.now() - request.loggingStartTime;
+    
+    (request.log as any).info({
+      requestId: request.requestId,
+      statusCode: reply.statusCode,
+      duration,
+      method: request.method,
+      url: request.url,
+    }, 'Request completed');
+
+    // Update server statistics
+    if (request.server?.stats) {
+      request.server.stats.averageResponseTime = 
+        (request.server.stats.averageResponseTime + duration) / 2;
+      
+      if (reply.statusCode >= 400) {
+        request.server.stats.errorRate = 
+          (request.server.stats.errorRate + 1) / 2;
+      }
+    }
+  }
+}
+
+// Response metrics hook for metrics collection
+export async function onResponseMetricsHook(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (request.metricsStartTime) {
+    try {
+      const redis = getRedis();
+      const duration = Date.now() - request.metricsStartTime;
+      
+      // Collect request metrics
+      await redis.incrementMetric('requests_total');
+      await redis.incrementMetric(`requests_by_status_${reply.statusCode}`);
+      await redis.incrementMetric(`requests_by_method_${request.method.toLowerCase()}`);
+      
+      // Track response times
+      await redis.queueEvent({
+        type: 'performance',
+        level: 'info',
+        source: 'api-server',
+        message: 'Request completed',
+        metadata: {
+          method: request.method,
+          url: request.url,
+          statusCode: reply.statusCode,
+          duration,
+          requestId: request.requestId,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      (request.log as any).error({ error: error instanceof Error ? error.message : String(error) }, 'Metrics collection error');
+    }
+  }
 }
 
 // Export all middleware
@@ -497,6 +469,8 @@ export const middleware = {
   websocketConnection: websocketConnectionMiddleware,
   metrics: metricsMiddleware,
   batchProcessing: batchProcessingMiddleware,
+  onResponseLogging: onResponseLoggingHook,
+  onResponseMetrics: onResponseMetricsHook,
 };
 
 export default middleware;

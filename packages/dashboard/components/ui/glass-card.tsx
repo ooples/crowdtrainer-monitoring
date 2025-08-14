@@ -10,6 +10,9 @@ interface GlassCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
   hover?: boolean;
   glow?: boolean;
   className?: string;
+  interactive?: boolean;
+  ariaLabel?: string;
+  role?: string;
 }
 
 const variants = {
@@ -36,6 +39,9 @@ export function GlassCard({
   variant = 'default', 
   hover = true,
   glow = false,
+  interactive = false,
+  ariaLabel,
+  role,
   className = "",
   ...props 
 }: GlassCardProps) {
@@ -45,11 +51,23 @@ export function GlassCard({
       className={cn(
         'rounded-xl',
         variants[variant],
-        hover && 'hover:bg-white/10 transition-all duration-300 cursor-pointer',
+        hover && 'hover:bg-white/10 transition-all duration-300',
+        interactive && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900',
         glow && 'shadow-[0_0_20px_rgba(59,130,246,0.15)]',
         className
       )}
       whileHover={hover ? { scale: 1.02, y: -2 } : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      role={role}
+      aria-label={ariaLabel}
+      onKeyDown={interactive ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (props.onClick) {
+            props.onClick(e as any);
+          }
+        }
+      } : undefined}
       {...props}
     >
       {children}

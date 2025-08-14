@@ -1,11 +1,11 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getDatabase } from '../database';
 import { getRedis } from '../redis';
 import { getWebSocketManager } from '../websocket';
 import { requirePermission } from '../middleware';
-import { AlertConfig, AlertConfigSchema } from '../types';
-import cron from 'node-cron';
+import { AlertConfigSchema } from '../types';
+import * as cron from 'node-cron';
 
 // Request schemas
 const CreateAlertSchema = z.object({
@@ -56,12 +56,43 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Create alert configuration
-  fastify.post('/', {
+  fastify.post<{ Body: z.infer<typeof CreateAlertSchema.shape.body> }>('/', {
     schema: {
-      description: 'Create a new alert configuration',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
-      body: CreateAlertSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          enabled: { type: 'boolean', default: true },
+          conditions: {
+            type: 'object',
+            properties: {
+              metric: { type: 'string' },
+              operator: { type: 'string', enum: ['gt', 'lt', 'gte', 'lte', 'eq', 'ne'] },
+              threshold: { type: 'number' },
+              timeWindow: { type: 'number' },
+              occurrences: { type: 'number', default: 1 }
+            },
+            required: ['metric', 'operator', 'threshold', 'timeWindow']
+          },
+          actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['webhook', 'email', 'slack', 'discord', 'pagerduty'] },
+                endpoint: { type: 'string', format: 'uri' },
+                template: { type: 'string' }
+              },
+              required: ['type', 'endpoint']
+            }
+          },
+          cooldown: { type: 'number', default: 300 },
+          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'], default: 'medium' },
+          tags: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['name', 'conditions', 'actions']
+      },
       response: {
         201: {
           type: 'object',
@@ -78,9 +109,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { body } = CreateAlertSchema.parse(request);
       
@@ -118,7 +149,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error creating alert:', error);
+      console.error(`Error creating alert: ${error instanceof Error ? error.message : String(error)}`);
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -136,12 +167,18 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Get alert configurations
-  fastify.get('/', {
+  fastify.get<{ Querystring: z.infer<typeof QueryAlertsSchema.shape.query> }>('/', {
     schema: {
-      description: 'Get alert configurations with filtering',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
-      querystring: QueryAlertsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          enabled: { type: 'boolean' },
+          severity: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          tags: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          limit: { type: 'number', minimum: 1, maximum: 1000, default: 100 },
+          offset: { type: 'number', minimum: 0, default: 0 }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -175,9 +212,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { query } = QueryAlertsSchema.parse(request);
 
@@ -233,7 +270,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error getting alert configurations:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get alert configurations',
@@ -242,11 +279,8 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Get alert configuration by ID
-  fastify.get('/:id', {
+  fastify.get<{ Params: { id: string } }>('/:id', {
     schema: {
-      description: 'Get alert configuration by ID',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
       params: {
         type: 'object',
         properties: {
@@ -277,9 +311,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query(`
         SELECT 
@@ -299,7 +333,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       reply.send(result.rows[0]);
 
     } catch (error) {
-      request.log.error('Error getting alert configuration:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get alert configuration',
@@ -308,11 +342,11 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Update alert configuration
-  fastify.put('/:id', {
+  fastify.put<{ 
+    Params: { id: string };
+    Body: z.infer<typeof UpdateAlertSchema.shape.body>;
+  }>('/:id', {
     schema: {
-      description: 'Update alert configuration',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
       params: {
         type: 'object',
         properties: {
@@ -320,7 +354,38 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
         },
         required: ['id'],
       },
-      body: UpdateAlertSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          enabled: { type: 'boolean' },
+          conditions: {
+            type: 'object',
+            properties: {
+              metric: { type: 'string' },
+              operator: { type: 'string', enum: ['gt', 'lt', 'gte', 'lte', 'eq', 'ne'] },
+              threshold: { type: 'number' },
+              timeWindow: { type: 'number' },
+              occurrences: { type: 'number' }
+            }
+          },
+          actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['webhook', 'email', 'slack', 'discord', 'pagerduty'] },
+                endpoint: { type: 'string', format: 'uri' },
+                template: { type: 'string' }
+              }
+            }
+          },
+          cooldown: { type: 'number' },
+          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          tags: { type: 'array', items: { type: 'string' } }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -336,9 +401,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { body } = UpdateAlertSchema.parse(request);
       const updateFields: string[] = [];
@@ -425,7 +490,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error updating alert configuration:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to update alert configuration',
@@ -434,11 +499,10 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Delete alert configuration
-  fastify.delete('/:id', {
+  fastify.delete<{ 
+    Params: { id: string };
+  }>('/:id', {
     schema: {
-      description: 'Delete alert configuration',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
       params: {
         type: 'object',
         properties: {
@@ -461,9 +525,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('admin')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query('DELETE FROM alert_configs WHERE id = $1', [request.params.id]);
 
@@ -483,7 +547,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error deleting alert configuration:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to delete alert configuration',
@@ -492,11 +556,11 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Test alert configuration
-  fastify.post('/:id/test', {
+  fastify.post<{ 
+    Params: { id: string };
+    Body: z.infer<typeof TestAlertSchema.shape.body>;
+  }>('/:id/test', {
     schema: {
-      description: 'Test alert configuration with sample data',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
       params: {
         type: 'object',
         properties: {
@@ -504,7 +568,12 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
         },
         required: ['id'],
       },
-      body: TestAlertSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          testData: { type: 'object', additionalProperties: true }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -516,12 +585,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest<{ 
-    Params: { id: string };
-    Body: { testData?: Record<string, any> };
-  }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       // Get alert configuration
       const alertResult = await db.query(`
@@ -541,8 +607,8 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
 
       // Use test data or get latest metric value
       let testValue: number;
-      if (request.body.testData && request.body.testData.value !== undefined) {
-        testValue = request.body.testData.value;
+      if (request.body.testData && typeof request.body.testData === 'object' && request.body.testData.value !== undefined) {
+        testValue = Number(request.body.testData.value);
       } else {
         // Get latest metric value from database
         const metricResult = await db.query(`
@@ -581,7 +647,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error testing alert:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to test alert configuration',
@@ -590,12 +656,20 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Get alert instances (triggered alerts)
-  fastify.get('/instances', {
+  fastify.get<{ Querystring: z.infer<typeof QueryAlertInstancesSchema.shape.query> }>('/instances', {
     schema: {
-      description: 'Get alert instances (triggered alerts)',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
-      querystring: QueryAlertInstancesSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          alertConfigId: { type: 'string', format: 'uuid' },
+          status: { type: 'string', enum: ['active', 'resolved'] },
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          severity: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          limit: { type: 'number', minimum: 1, maximum: 1000, default: 100 },
+          offset: { type: 'number', minimum: 0, default: 0 }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -627,9 +701,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { query } = QueryAlertInstancesSchema.parse(request);
 
@@ -699,7 +773,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error getting alert instances:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get alert instances',
@@ -708,11 +782,10 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
   });
 
   // Resolve alert instance
-  fastify.post('/instances/:id/resolve', {
+  fastify.post<{ 
+    Params: { id: string };
+  }>('/instances/:id/resolve', {
     schema: {
-      description: 'Resolve alert instance',
-      tags: ['alerts'],
-      security: [{ apiKey: [] }],
       params: {
         type: 'object',
         properties: {
@@ -728,9 +801,9 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
           },
         },
       },
-    },
+    } as any,
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query(`
         UPDATE alert_instances 
@@ -763,7 +836,7 @@ export default async function alertsRoutes(fastify: FastifyInstance): Promise<vo
       });
 
     } catch (error) {
-      request.log.error('Error resolving alert instance:', error);
+      console.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to resolve alert instance',

@@ -1,4 +1,4 @@
-import fastify, { FastifyInstance } from 'fastify';
+import fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -16,6 +16,7 @@ import eventsRoutes from './routes/events';
 import metricsRoutes from './routes/metrics';
 import dashboardRoutes from './routes/dashboard';
 import alertsRoutes from './routes/alerts';
+import adminRoutes from './routes/admin';
 
 // Load environment variables
 config();
@@ -37,17 +38,19 @@ const serverStats: ServerStats = {
 };
 
 // Create Fastify instance
-const server: FastifyInstance = fastify({
-  logger: {
+const server = fastify({
+  logger: env.NODE_ENV === 'development' ? {
     level: env.LOG_LEVEL,
-    transport: env.NODE_ENV === 'development' ? {
+    transport: {
       target: 'pino-pretty',
       options: {
         colorize: true,
         translateTime: 'HH:MM:ss Z',
         ignore: 'pid,hostname',
       },
-    } : undefined,
+    },
+  } : {
+    level: env.LOG_LEVEL,
   },
   trustProxy: env.TRUST_PROXY,
   bodyLimit: env.MAX_PAYLOAD_SIZE,
@@ -85,25 +88,25 @@ const gracefulShutdown = async (signal: string) => {
     server.log.info('Server closed successfully');
     process.exit(0);
   } catch (error) {
-    server.log.error('Error during shutdown:', error);
+    server.log.error({ error: error instanceof Error ? error.message : String(error) }, 'Error during shutdown');
     process.exit(1);
   }
 };
 
 // Register shutdown handlers
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.on('SIGUSR2', () => void gracefulShutdown('SIGUSR2')); // nodemon
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  server.log.fatal('Uncaught exception:', error);
-  gracefulShutdown('uncaughtException');
+  server.log.fatal({ err: error }, 'Uncaught exception');
+  void gracefulShutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  server.log.fatal('Unhandled rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('unhandledRejection');
+  server.log.fatal({ reason, promise }, 'Unhandled rejection');
+  void gracefulShutdown('unhandledRejection');
 });
 
 // Initialize server
@@ -138,14 +141,13 @@ async function start() {
       global: false, // We'll apply per route
       max: env.RATE_LIMIT_MAX,
       timeWindow: env.RATE_LIMIT_WINDOW_MS,
-      skipSuccessfulRequests: false,
       skipOnError: false,
       keyGenerator: (request) => {
         return request.headers['x-api-key'] as string || 
                request.ip || 
                'anonymous';
       },
-      errorResponseBuilder: (request, context) => {
+      errorResponseBuilder: (_request, context) => {
         return {
           error: 'Rate limit exceeded',
           message: `Too many requests, retry after ${Math.round(context.ttl / 1000)} seconds`,
@@ -185,10 +187,10 @@ async function start() {
         deepLinking: false,
       },
       uiHooks: {
-        onRequest: function (request, reply, next) {
+        onRequest: function (_request, _reply, next) {
           next();
         },
-        preHandler: function (request, reply, next) {
+        preHandler: function (_request, _reply, next) {
           next();
         },
       },
@@ -214,15 +216,16 @@ async function start() {
 
     // Initialize Redis connection
     server.log.info('Connecting to Redis...');
-    const redis = await initRedis({
+    const redisConfig = {
       host: env.REDIS_HOST,
       port: env.REDIS_PORT,
-      password: env.REDIS_PASSWORD,
       db: env.REDIS_DB,
       retryDelayOnFailover: 100,
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
-    });
+      ...(env.REDIS_PASSWORD && { password: env.REDIS_PASSWORD })
+    };
+    const redis = await initRedis(redisConfig);
     server.decorate('redis', redis);
 
     // Initialize WebSocket
@@ -259,7 +262,7 @@ async function start() {
           },
         },
       },
-    }, async (request, reply) => {
+    }, async (_request, reply) => {
       const uptime = Date.now() - serverStats.uptime;
       
       // Check database connection
@@ -268,7 +271,7 @@ async function start() {
         await server.db.query('SELECT 1');
       } catch (error) {
         dbStatus = 'error';
-        server.log.error('Database health check failed:', error);
+        server.log.error({ error: error instanceof Error ? error.message : String(error) }, 'Database health check failed');
       }
       
       // Check Redis connection
@@ -277,7 +280,7 @@ async function start() {
         await server.redis.ping();
       } catch (error) {
         redisStatus = 'error';
-        server.log.error('Redis health check failed:', error);
+        server.log.error({ error: error instanceof Error ? error.message : String(error) }, 'Redis health check failed');
       }
       
       const health = {
@@ -314,7 +317,7 @@ async function start() {
           },
         },
       },
-    }, async (request, reply) => {
+    }, async (_request, reply) => {
       const stats = {
         ...serverStats,
         uptime: Date.now() - serverStats.uptime,
@@ -330,6 +333,7 @@ async function start() {
     await server.register(metricsRoutes, { prefix: '/api/v1/metrics' });
     await server.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
     await server.register(alertsRoutes, { prefix: '/api/v1/alerts' });
+    await server.register(adminRoutes, { prefix: '/api/v1/admin' });
 
     // Start server
     await server.listen({
@@ -342,7 +346,7 @@ async function start() {
     server.log.info(`🔍 Health check available at http://localhost:${env.PORT}/health`);
 
   } catch (error) {
-    server.log.fatal('Error starting server:', error);
+    server.log.fatal({ error: error instanceof Error ? error.message : String(error) }, 'Error starting server');
     process.exit(1);
   }
 }

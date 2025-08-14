@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import './accessibility.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,9 +24,20 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className="dark">
-      <head />
+      <head>
+        <meta name="color-scheme" content="dark" />
+        <meta name="theme-color" content="#1e293b" />
+      </head>
       <body className={`${inter.className} antialiased`}>
-        {children}
+        <a 
+          href="#main-content" 
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded focus:no-underline"
+        >
+          Skip to main content
+        </a>
+        <main id="main-content" role="main">
+          {children}
+        </main>
       </body>
     </html>
   );

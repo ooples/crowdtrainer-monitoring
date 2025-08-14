@@ -14,7 +14,8 @@ import {
   Zap, 
   TrendingUp,
   Shield,
-  Eye
+  Eye,
+  Settings
 } from 'lucide-react';
 
 // Components
@@ -23,6 +24,22 @@ import { MetricsCard, MiniChart } from '@/components/monitoring/metrics-card';
 import { EventList } from '@/components/monitoring/event-list';
 import { AlertsPanel } from '@/components/monitoring/alerts-panel';
 import { DashboardFiltersComponent } from '@/components/monitoring/dashboard-filters';
+import { UnifiedActivityPanel } from '@/components/monitoring/unified-activity-panel';
+import { ModeSwitcher } from '@/components/ui/mode-switcher';
+import { SmartNotifications, useSmartNotifications } from '@/components/ui/smart-notifications';
+import { ShortcutHelper } from '@/components/ui/shortcut-helper';
+import { AdminPanel } from '@/components/admin/AdminPanel';
+
+// Providers
+import { ModeProvider } from '@/components/providers/mode-provider';
+import { AdminModeProvider } from '@/components/providers/admin-mode-provider';
+import { A11yProvider } from '@/components/accessibility/A11yProvider';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
+
+// Hooks
+import { useDashboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import { useMode } from '@/components/providers/mode-provider';
+import { useAdminMode } from '@/components/providers/admin-mode-provider';
 
 // Types and utilities
 import { 
@@ -37,6 +54,8 @@ import {
 import { createApiClient } from '@/lib/api-client';
 import { defaultConfig } from '@/lib/config';
 import { formatTimeAgo, exportToJson } from '@/lib/utils';
+import { demoEvents, demoAlerts, demoMetrics, updateMetricsWithRealtimeData } from '@/lib/demo-data';
+import { printAccessibilityReport } from '@/lib/accessibility-test';
 
 // Animation variants
 const containerVariants = {
@@ -62,10 +81,35 @@ const itemVariants = {
   }
 };
 
-export default function MonitoringDashboard() {
+function DashboardContent() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [announcements, setAnnouncements] = useState<string[]>([]);
+  
+  // Announcement function for screen readers
+  const announce = (message: string) => {
+    setAnnouncements(prev => [...prev, message]);
+    // Clear announcement after 3 seconds to prevent clutter
+    setTimeout(() => {
+      setAnnouncements(prev => prev.slice(1));
+    }, 3000);
+  };
+  
+  // Smart notifications
+  const { 
+    notifications, 
+    addNotification, 
+    dismissNotification, 
+    clearAll: clearAllNotifications 
+  } = useSmartNotifications();
+  
+  // Keyboard shortcuts
+  const shortcuts = useDashboardShortcuts();
+  
+  // Mode and admin contexts
+  const { mode, canShowFeature } = useMode();
+  const { isAdminMode } = useAdminMode();
   
   // Data state
   const [metrics, setMetrics] = useState<SystemMetrics>({
@@ -139,15 +183,56 @@ export default function MonitoringDashboard() {
     try {
       const response = await apiClient.getMetrics();
       if (response.success && response.data) {
+        const oldHealth = metrics.systemHealth;
+        const oldErrorRate = metrics.errorRate;
+        const oldActiveUsers = metrics.activeUsers;
+        
         setMetrics(response.data);
+        
+        // Announce significant changes for screen readers
+        if (oldHealth !== 'checking' && response.data.systemHealth !== oldHealth) {
+          announce(`System health changed from ${oldHealth} to ${response.data.systemHealth}`);
+          
+          // Smart notification for health changes
+          addNotification({
+            type: response.data.systemHealth === 'critical' ? 'error' : 
+                  response.data.systemHealth === 'degraded' ? 'warning' : 'success',
+            title: 'System Health Changed',
+            message: `System health is now ${response.data.systemHealth}`,
+            priority: response.data.systemHealth === 'critical' ? 'critical' : 'medium',
+            category: 'system'
+          });
+        }
+        
+        // Announce significant error rate changes
+        if (oldErrorRate > 0 && Math.abs(response.data.errorRate - oldErrorRate) > 2) {
+          announce(`Error rate changed from ${oldErrorRate}% to ${response.data.errorRate}%`);
+        }
+        
+        // Announce if there's a significant user count change (more than 20% change)
+        if (oldActiveUsers > 0 && Math.abs(response.data.activeUsers - oldActiveUsers) / oldActiveUsers > 0.2) {
+          announce(`Active users changed from ${oldActiveUsers} to ${response.data.activeUsers}`);
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch metrics:', error);
-      setMetrics(prev => ({ 
-        ...prev, 
-        lastUpdated: new Date().toISOString(),
-        systemHealth: 'critical'
-      }));
+      console.error('Failed to fetch metrics, using demo data:', error);
+      
+      // Use demo data with real-time simulation
+      const oldHealth = metrics.systemHealth;
+      const updatedDemoMetrics = updateMetricsWithRealtimeData(metrics.lastUpdated ? metrics : demoMetrics);
+      setMetrics(updatedDemoMetrics);
+      
+      // Show notification about using demo data (only once)
+      if (oldHealth === 'checking') {
+        addNotification({
+          type: 'info',
+          title: 'Demo Mode Active',
+          message: 'Using simulated data - monitoring API unavailable',
+          priority: 'low',
+          category: 'system',
+          autoClose: false
+        });
+      }
     }
   };
 
@@ -158,7 +243,8 @@ export default function MonitoringDashboard() {
         setAlerts(response.data.alerts || []);
       }
     } catch (error) {
-      console.error('Failed to fetch alerts:', error);
+      console.error('Failed to fetch alerts, using demo data:', error);
+      setAlerts(demoAlerts);
     }
   };
 
@@ -170,6 +256,14 @@ export default function MonitoringDashboard() {
     const initialize = async () => {
       await Promise.all([fetchMetrics(), fetchAlerts()]);
       setLoading(false);
+      
+      // Run accessibility test in development mode after a delay to let everything render
+      if (process.env.NODE_ENV === 'development') {
+        setTimeout(() => {
+          printAccessibilityReport();
+          console.log('💡 Tip: Type testAccessibility() in the console to run accessibility tests anytime');
+        }, 2000);
+      }
     };
     
     initialize();
@@ -225,8 +319,29 @@ export default function MonitoringDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 relative overflow-hidden">
+      {/* Skip Navigation */}
+      <nav className="sr-only focus-within:not-sr-only" aria-label="Skip navigation">
+        <a 
+          href="#dashboard-header" 
+          className="absolute top-4 left-4 z-50 px-4 py-2 bg-blue-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          Skip to dashboard header
+        </a>
+        <a 
+          href="#metrics-section" 
+          className="absolute top-4 left-40 z-50 px-4 py-2 bg-blue-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          Skip to metrics
+        </a>
+        <a 
+          href="#activity-section" 
+          className="absolute top-4 left-60 z-50 px-4 py-2 bg-blue-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          Skip to activity
+        </a>
+      </nav>
       {/* Animated Background */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" aria-hidden="true">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-purple-900/20"></div>
         <div className="absolute top-0 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
         <div className="absolute top-40 -right-40 w-80 h-80 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-2000"></div>
@@ -245,18 +360,19 @@ export default function MonitoringDashboard() {
         </div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto p-8">
+      <div className="relative max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-6 lg:space-y-8"
         >
           {/* Header */}
-          <motion.div variants={itemVariants} className="flex justify-between items-center">
+          <header id="dashboard-header" role="banner">
+            <motion.div variants={itemVariants} className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
             <div className="flex items-center gap-4">
               <motion.h1 
-                className="text-4xl font-bold gradient-text"
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
@@ -274,18 +390,36 @@ export default function MonitoringDashboard() {
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                 className="w-3 h-3 bg-blue-500 rounded-full"
               />
+              
+              {/* Mode indicator for simple mode */}
+              {mode === 'simple' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="hidden sm:flex px-3 py-1 bg-green-500/20 border border-green-500/40 rounded-full text-green-300 text-sm font-medium"
+                >
+                  Simple Mode
+                </motion.div>
+              )}
             </div>
             
-            <motion.div variants={itemVariants} className="flex gap-3 items-center">
+            <div className="flex flex-col sm:flex-row gap-4 lg:gap-6">
+              {/* Mode Switcher */}
+              <ModeSwitcher />
+              
+              <motion.div variants={itemVariants} className="flex flex-wrap gap-3 items-center justify-center sm:justify-start">
               <motion.button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`group relative px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                className={`group relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
                   autoRefresh 
                     ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/25' 
                     : 'bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20'
                 }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                aria-pressed={autoRefresh}
+                aria-label={autoRefresh ? 'Turn off auto-refresh' : 'Turn on auto-refresh'}
+                title={autoRefresh ? 'Auto-refresh is currently enabled' : 'Auto-refresh is currently disabled'}
               >
                 <div className="flex items-center gap-2">
                   {autoRefresh ? (
@@ -293,38 +427,69 @@ export default function MonitoringDashboard() {
                       animate={{ rotate: 360 }}
                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                     >
-                      <RefreshCw className="w-4 h-4" />
+                      <RefreshCw className="w-4 h-4" aria-hidden="true" />
                     </motion.div>
                   ) : (
-                    <Play className="w-4 h-4" />
+                    <Play className="w-4 h-4" aria-hidden="true" />
                   )}
-                  {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                  <span className="hidden sm:inline">
+                    {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                  </span>
+                  <span className="sm:hidden">
+                    {autoRefresh ? 'ON' : 'OFF'}
+                  </span>
                 </div>
               </motion.button>
               
-              <motion.button
-                onClick={handleExportData}
-                className="group relative px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300"
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export Data
-                </div>
-              </motion.button>
+{canShowFeature('advanced') && (
+                <motion.button
+                  onClick={handleExportData}
+                  data-action="export"
+                  className="group relative px-3 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  aria-label="Export dashboard data as JSON file"
+                  title="Download current dashboard data and metrics"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-4 h-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">Export Data</span>
+                    <span className="sm:hidden">Export</span>
+                  </div>
+                </motion.button>
+              )}
               
               <motion.div 
                 className="px-4 py-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl"
                 variants={itemVariants}
               >
                 <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Clock className="w-4 h-4" />
-                  <span>Last updated: {metrics.lastUpdated ? new Date(metrics.lastUpdated).toLocaleTimeString() : 'Never'}</span>
+                  <Clock className="w-4 h-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Last updated: {metrics.lastUpdated ? new Date(metrics.lastUpdated).toLocaleTimeString() : 'Never'}</span>
+                  <span className="sm:hidden">{metrics.lastUpdated ? new Date(metrics.lastUpdated).toLocaleTimeString() : 'Never'}</span>
                 </div>
               </motion.div>
+              </motion.div>
+            </div>
             </motion.div>
-          </motion.div>
+          </header>
+
+          {/* Admin Panel - Shows as integrated section at TOP when admin mode is active */}
+          <AnimatePresence>
+            {isAdminMode && (
+              <motion.div
+                variants={itemVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
+                <AdminPanel 
+                  apiUrl={defaultConfig.apiUrl}
+                  apiKey={defaultConfig.apiKey}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Alerts */}
           <AnimatePresence>
@@ -346,7 +511,9 @@ export default function MonitoringDashboard() {
           </AnimatePresence>
 
           {/* Metrics Cards */}
-          <motion.div variants={itemVariants} className="grid grid-cols-4 gap-6">
+          <section id="metrics-section" aria-labelledby="metrics-heading" tabIndex={-1} className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-lg">
+            <h2 id="metrics-heading" className="sr-only">System Metrics</h2>
+            <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             <MetricsCard
               title="System Health"
               value={metrics.systemHealth}
@@ -391,54 +558,33 @@ export default function MonitoringDashboard() {
                 value: Math.round(Math.random() * 20)
               }}
             />
-          </motion.div>
-
-          {/* Filters */}
-          <DashboardFiltersComponent
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            eventStats={eventStats}
-          />
-
-          {/* Events Section */}
-          <GlassCard className="p-6">
-            <motion.div 
-              className="flex justify-between items-center mb-6"
-              variants={itemVariants}
-            >
-              <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-blue-400" />
-                <h2 className="text-2xl font-semibold text-white">Recent Activity</h2>
-                <motion.div
-                  className="px-3 py-1 bg-blue-500/20 border border-blue-500/40 rounded-full text-blue-300 text-sm font-medium"
-                  key={filteredEvents.length}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200 }}
-                >
-                  {filteredEvents.length} events
-                </motion.div>
-              </div>
-              
-              <motion.div
-                className="flex items-center gap-2 text-sm text-gray-400"
-                variants={itemVariants}
-              >
-                <Eye className="w-4 h-4" />
-                <span>Live monitoring</span>
-              </motion.div>
             </motion.div>
+          </section>
 
-            <EventList
-              events={filteredEvents}
-              loading={loading}
-              onEventClick={handleEventClick}
+          {/* Filters - Show for advanced and expert modes */}
+          {canShowFeature('advanced') && (
+            <DashboardFiltersComponent
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              eventStats={eventStats}
             />
-          </GlassCard>
+          )}
 
-          {/* OAuth Status */}
+          {/* Unified Activity Panel */}
+          <section id="activity-section" aria-labelledby="activity-heading" tabIndex={-1} className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-lg">
+            <h2 id="activity-heading" className="sr-only">System Activity and Events</h2>
+            <UnifiedActivityPanel
+            events={filteredEvents}
+            alerts={alerts}
+            loading={loading}
+            onEventClick={handleEventClick}
+            onAlertClick={handleAlertClick}
+          />
+          </section>
+
+          {/* OAuth Status - Advanced and Expert modes only */}
           <AnimatePresence>
-            {metrics.oauth && (
+            {metrics.oauth && canShowFeature('advanced') && (
               <motion.div
                 variants={itemVariants}
                 initial="hidden"
@@ -512,9 +658,53 @@ export default function MonitoringDashboard() {
               </motion.div>
             )}
           </AnimatePresence>
+
         </motion.div>
       </div>
+      
+      {/* Smart Notifications */}
+      <SmartNotifications
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        maxVisible={mode === 'simple' ? 3 : mode === 'advanced' ? 5 : 8}
+      />
+      
+      {/* Keyboard Shortcut Helper */}
+      <ShortcutHelper shortcuts={shortcuts} />
+      
+      {/* Live Region for Screen Reader Announcements */}
+      <div aria-live="polite" aria-atomic="false" className="sr-only">
+        {announcements.map((announcement, index) => (
+          <div key={`${announcement}-${index}`}>
+            {announcement}
+          </div>
+        ))}
+      </div>
+      
+      {/* Critical Alert Live Region */}
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alerts.filter(alert => alert.severity === 'critical').length > 0 && (
+          <div>
+            Critical alert: {alerts.filter(alert => alert.severity === 'critical').length} critical alerts require attention
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+// Main component with providers
+export default function MonitoringDashboard() {
+  return (
+    <ThemeProvider defaultTheme="dark-modern">
+      <A11yProvider>
+        <ModeProvider defaultMode="simple">
+          <AdminModeProvider>
+            <DashboardContent />
+          </AdminModeProvider>
+        </ModeProvider>
+      </A11yProvider>
+    </ThemeProvider>
   );
 }
 

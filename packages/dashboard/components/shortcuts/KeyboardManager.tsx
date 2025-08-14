@@ -44,6 +44,7 @@ import {
   Layout,
   Grid,
   List,
+  Gauge,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/glass-card';
 import { useTheme } from '@/components/theme/ThemeProvider';
@@ -78,7 +79,8 @@ export type KeyboardCategory =
   | 'alerts'
   | 'help'
   | 'accessibility'
-  | 'system';
+  | 'system'
+  | 'mode';
 
 export interface KeyboardManagerConfig {
   enabled: boolean;
@@ -572,6 +574,92 @@ const createDefaultShortcuts = (handlers: Record<string, () => void>): KeyboardS
     stopPropagation: true,
     priority: 2,
   },
+
+  // Mode Management
+  {
+    id: 'cycle-mode',
+    name: 'Cycle Dashboard Mode',
+    description: 'Switch between Simple, Advanced, and Expert modes',
+    key: 'm',
+    modifiers: ['ctrl'],
+    category: 'mode',
+    action: handlers.cycleMode || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 1,
+  },
+  {
+    id: 'cycle-mode-reverse',
+    name: 'Cycle Dashboard Mode (Reverse)',
+    description: 'Switch between modes in reverse order',
+    key: 'm',
+    modifiers: ['ctrl', 'shift'],
+    category: 'mode',
+    action: handlers.cycleModeReverse || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 1,
+  },
+  {
+    id: 'toggle-admin-overlay',
+    name: 'Toggle Admin Overlay',
+    description: 'Enable or disable admin mode overlay',
+    key: 'a',
+    modifiers: ['ctrl', 'shift'],
+    category: 'mode',
+    action: handlers.toggleAdminOverlay || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 1,
+  },
+  {
+    id: 'set-simple-mode',
+    name: 'Switch to Simple Mode',
+    description: 'Switch directly to Simple mode',
+    key: '1',
+    modifiers: ['ctrl', 'alt'],
+    category: 'mode',
+    action: handlers.setSimpleMode || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 2,
+  },
+  {
+    id: 'set-advanced-mode',
+    name: 'Switch to Advanced Mode',
+    description: 'Switch directly to Advanced mode',
+    key: '2',
+    modifiers: ['ctrl', 'alt'],
+    category: 'mode',
+    action: handlers.setAdvancedMode || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 2,
+  },
+  {
+    id: 'set-expert-mode',
+    name: 'Switch to Expert Mode',
+    description: 'Switch directly to Expert mode',
+    key: '3',
+    modifiers: ['ctrl', 'alt'],
+    category: 'mode',
+    action: handlers.setExpertMode || (() => {}),
+    enabled: true,
+    global: true,
+    preventDefault: true,
+    stopPropagation: true,
+    priority: 2,
+  },
 ];
 
 // Keyboard Manager Hook
@@ -857,6 +945,14 @@ export const KeyboardManager: React.FC<KeyboardManagerProps> = ({
       }),
       selectAll: handlers.selectAll || (() => onShortcut?.('select-all')),
       copyData: handlers.copyData || (() => onShortcut?.('copy-data')),
+      
+      // Mode management handlers
+      cycleMode: handlers.cycleMode || (() => onShortcut?.('cycle-mode')),
+      cycleModeReverse: handlers.cycleModeReverse || (() => onShortcut?.('cycle-mode-reverse')),
+      toggleAdminOverlay: handlers.toggleAdminOverlay || (() => onShortcut?.('toggle-admin-overlay')),
+      setSimpleMode: handlers.setSimpleMode || (() => onShortcut?.('set-simple-mode')),
+      setAdvancedMode: handlers.setAdvancedMode || (() => onShortcut?.('set-advanced-mode')),
+      setExpertMode: handlers.setExpertMode || (() => onShortcut?.('set-expert-mode')),
     };
     
     const shortcuts = createDefaultShortcuts(defaultHandlers);
@@ -916,6 +1012,7 @@ export const KeyboardManager: React.FC<KeyboardManagerProps> = ({
       case 'help': return HelpCircle;
       case 'accessibility': return BookOpen;
       case 'system': return Command;
+      case 'mode': return Gauge;
       default: return Keyboard;
     }
   };
@@ -932,6 +1029,7 @@ export const KeyboardManager: React.FC<KeyboardManagerProps> = ({
       case 'help': return '#6b7280';
       case 'accessibility': return '#10b981';
       case 'system': return '#84cc16';
+      case 'mode': return '#f97316';
       default: return '#6b7280';
     }
   };

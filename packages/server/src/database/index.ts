@@ -1,6 +1,7 @@
 import { Pool, PoolClient, PoolConfig } from 'pg';
 import { DatabaseConfig } from '../types';
 
+
 export class DatabaseManager {
   private pool: Pool;
   private isConnected = false;
@@ -24,15 +25,15 @@ export class DatabaseManager {
     this.pool = new Pool(poolConfig);
 
     // Handle pool errors
-    this.pool.on('error', (err, client) => {
+    this.pool.on('error', (err, _client) => {
       console.error('Unexpected database pool error:', err);
     });
 
-    this.pool.on('connect', (client) => {
+    this.pool.on('connect', (_client) => {
       console.log('Database client connected');
     });
 
-    this.pool.on('remove', (client) => {
+    this.pool.on('remove', (_client) => {
       console.log('Database client removed');
     });
   }
@@ -128,7 +129,7 @@ export class DatabaseManager {
       // Create events table with TimescaleDB hypertable
       await this.query(`
         CREATE TABLE IF NOT EXISTS events (
-          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          id UUID DEFAULT uuid_generate_v4(),
           timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           type VARCHAR(50) NOT NULL,
           level VARCHAR(20) NOT NULL DEFAULT 'info',
@@ -143,7 +144,8 @@ export class DatabaseManager {
           url TEXT,
           user_agent TEXT,
           ip INET,
-          created_at TIMESTAMPTZ DEFAULT NOW()
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (id, timestamp)
         )
       `);
 
@@ -158,14 +160,15 @@ export class DatabaseManager {
       // Create metrics table with TimescaleDB hypertable
       await this.query(`
         CREATE TABLE IF NOT EXISTS metrics (
-          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          id UUID DEFAULT uuid_generate_v4(),
           name VARCHAR(255) NOT NULL,
           value DOUBLE PRECISION NOT NULL,
           timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           unit VARCHAR(50),
           dimensions JSONB DEFAULT '{}',
           source VARCHAR(255) NOT NULL,
-          created_at TIMESTAMPTZ DEFAULT NOW()
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (id, timestamp)
         )
       `);
 

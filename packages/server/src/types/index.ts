@@ -13,7 +13,7 @@ export const EnvSchema = z.object({
   DATABASE_NAME: z.string().default('monitoring_db'),
   DATABASE_USER: z.string().default('monitoring_user'),
   DATABASE_PASSWORD: z.string(),
-  DATABASE_SSL: z.coerce.boolean().default(false),
+  DATABASE_SSL: z.string().transform(val => val === 'true').default('false'),
   
   // Redis
   REDIS_URL: z.string().optional(),
@@ -230,6 +230,11 @@ declare module 'fastify' {
       remaining: number;
       resetTime: Date;
     };
+    startTime?: number;
+    requestId?: string;
+    server: FastifyInstance;
+    loggingStartTime?: number;
+    metricsStartTime?: number;
   }
 }
 

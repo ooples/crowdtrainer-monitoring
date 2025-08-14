@@ -54,19 +54,26 @@ export function MetricsCard({
     return <MetricCardSkeleton className={className} />;
   }
 
-  const numericValue = typeof value === 'number' ? value : parseFloat(value.toString()) || 0;
+  const numericValue = typeof value === 'number' ? value : 
+    typeof value === 'string' ? parseFloat(value) || 0 : 
+    value != null ? parseFloat(String(value)) || 0 : 0;
   const TrendIcon = trend ? trendIcons[trend.direction] : null;
 
   return (
-    <GlassCard className={`group p-6 ${className}`} hover>
+    <GlassCard 
+      className={`group p-6 ${className}`} 
+      hover
+      role="article"
+      ariaLabel={`${title} metric: ${value != null ? formatMetricValue(value) : '0'} ${suffix}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Icon className={`w-5 h-5 text-gray-400 group-hover:text-white transition-colors ${color}`} />
-          <span className="text-gray-400 group-hover:text-gray-300 transition-colors font-medium">
+          <Icon className={`w-5 h-5 text-gray-400 group-hover:text-white transition-colors ${color}`} aria-hidden="true" />
+          <h3 className="text-gray-400 group-hover:text-gray-300 transition-colors font-medium" id={`metric-title-${title.replace(/\s+/g, '-').toLowerCase()}`}>
             {title}
-          </span>
+          </h3>
         </div>
-        {status && <StatusIndicator status={status} size="sm" />}
+        {status && <StatusIndicator status={status} size="sm" aria-label={`Status: ${status}`} />}
       </div>
 
       <motion.div 
@@ -75,28 +82,32 @@ export function MetricsCard({
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 200 }}
         key={value}
+        aria-labelledby={`metric-title-${title.replace(/\s+/g, '-').toLowerCase()}`}
+        aria-describedby={`metric-subtitle-${title.replace(/\s+/g, '-').toLowerCase()}`}
       >
-        {prefix}
-        <AnimatedNumber value={numericValue} />
-        {suffix}
+        <span aria-label={`Current value: ${formatMetricValue(numericValue)} ${suffix}`}>
+          {prefix}
+          <AnimatedNumber value={numericValue} />
+          {suffix}
+        </span>
       </motion.div>
 
       <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-gray-400" id={`metric-subtitle-${title.replace(/\s+/g, '-').toLowerCase()}`}>
           {subtitle}
         </div>
         
         {trend && TrendIcon && (
-          <div className={`flex items-center gap-1 text-sm ${trendColors[trend.direction]}`}>
-            <TrendIcon className="w-3 h-3" />
-            <span>{trend.value}%</span>
-            {trend.label && <span className="text-gray-500 ml-1">{trend.label}</span>}
+          <div className={`flex items-center gap-1 text-sm ${trendColors[trend.direction]}`} aria-label={`Trend: ${trend.direction} by ${trend.value} percent ${trend.label || ''}`}>
+            <TrendIcon className="w-3 h-3" aria-hidden="true" />
+            <span aria-hidden="true">{trend.value}%</span>
+            {trend.label && <span className="text-gray-500 ml-1" aria-hidden="true">{trend.label}</span>}
           </div>
         )}
       </div>
 
       {progress !== undefined && (
-        <div className="mt-4">
+        <div className="mt-4" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${title} progress: ${progress.toFixed(1)} percent`}>
           <div className="relative">
             <div className="w-full bg-gray-700 rounded-full h-2">
               <motion.div
@@ -106,7 +117,7 @@ export function MetricsCard({
                 transition={{ duration: 1, ease: "easeOut" }}
               />
             </div>
-            <div className="text-xs text-gray-400 mt-1">
+            <div className="text-xs text-gray-400 mt-1" aria-hidden="true">
               {progress.toFixed(1)}%
             </div>
           </div>
@@ -114,7 +125,7 @@ export function MetricsCard({
       )}
 
       {chart && (
-        <div className="mt-4">
+        <div className="mt-4" role="img" aria-label={`${title} chart showing trend data`}>
           {chart}
         </div>
       )}
@@ -145,17 +156,85 @@ export function MiniChart({ data, color = 'blue' }: { data: number[]; color?: st
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
+  const dataDescription = `Chart showing ${data.length} data points ranging from ${min.toFixed(1)} to ${max.toFixed(1)}`;
+  const [focusedPoint, setFocusedPoint] = React.useState<number | null>(null);
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const currentIndex = focusedPoint ?? -1;
+      if (e.key === 'ArrowRight' && currentIndex < data.length - 1) {
+        setFocusedPoint(currentIndex + 1);
+      } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+        setFocusedPoint(currentIndex - 1);
+      } else if (e.key === 'ArrowLeft' && currentIndex === -1) {
+        setFocusedPoint(data.length - 1);
+      }
+    } else if (e.key === 'Escape') {
+      setFocusedPoint(null);
+    }
+  };
+
+  // Listen for custom chart navigation events
+  React.useEffect(() => {
+    const chartElement = document.activeElement?.closest('[role="img"]');
+    if (!chartElement) return;
+
+    const handleNextPoint = () => {
+      const currentIndex = focusedPoint ?? -1;
+      if (currentIndex < data.length - 1) {
+        setFocusedPoint(currentIndex + 1);
+      }
+    };
+
+    const handlePrevPoint = () => {
+      const currentIndex = focusedPoint ?? -1;
+      if (currentIndex > 0) {
+        setFocusedPoint(currentIndex - 1);
+      } else if (currentIndex === -1) {
+        setFocusedPoint(data.length - 1);
+      }
+    };
+
+    chartElement.addEventListener('chart-next-point', handleNextPoint);
+    chartElement.addEventListener('chart-prev-point', handlePrevPoint);
+
+    return () => {
+      chartElement.removeEventListener('chart-next-point', handleNextPoint);
+      chartElement.removeEventListener('chart-prev-point', handlePrevPoint);
+    };
+  }, [focusedPoint, data.length]);
 
   return (
-    <div className="flex items-end gap-1 h-6">
+    <div 
+      className="flex items-end gap-1 h-6 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded" 
+      role="img" 
+      aria-label={focusedPoint !== null 
+        ? `${dataDescription}. Currently focused on point ${focusedPoint + 1} with value ${data[focusedPoint].toFixed(1)}`
+        : dataDescription
+      }
+      title={dataDescription}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       {data.map((value, i) => (
         <motion.div
           key={i}
-          className={`bg-gradient-to-t ${getChartColor(color)} rounded-sm flex-1`}
+          className={`bg-gradient-to-t ${getChartColor(color)} rounded-sm flex-1 relative ${
+            focusedPoint === i ? 'ring-2 ring-white' : ''
+          }`}
           initial={{ height: 0 }}
           animate={{ height: `${((value - min) / range) * 100}%` }}
           transition={{ delay: i * 0.1, duration: 0.5 }}
-        />
+          aria-hidden="true"
+        >
+          {focusedPoint === i && (
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+              {value.toFixed(1)}
+            </div>
+          )}
+        </motion.div>
       ))}
     </div>
   );

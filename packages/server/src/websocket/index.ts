@@ -49,7 +49,7 @@ export class WebSocketManager {
     await fastify.register(async function (fastify) {
       fastify.get('/ws/authenticated', { websocket: true }, async (connection, request) => {
         // Verify API key from query parameters
-        const apiKey = request.query?.apiKey as string;
+        const apiKey = (request.query as Record<string, any>)?.apiKey as string;
         if (!apiKey) {
           connection.close(1008, 'API key required');
           return;
@@ -79,17 +79,25 @@ export class WebSocketManager {
     }
 
     const clientId = this.generateClientId();
+    const metadata: WebSocketClient['metadata'] = {
+      connectedAt: new Date(),
+      lastPing: new Date(),
+      ip: request.ip || 'unknown',
+    };
+
+    if (request.headers['user-agent']) {
+      metadata.userAgent = request.headers['user-agent'];
+    }
+
+    if (apiKeyId) {
+      metadata.apiKey = apiKeyId;
+    }
+
     const client: WebSocketClient = {
       id: clientId,
       socket: connection,
       subscriptions: new Set(),
-      metadata: {
-        connectedAt: new Date(),
-        lastPing: new Date(),
-        ip: request.ip || 'unknown',
-        userAgent: request.headers['user-agent'],
-        apiKey: apiKeyId,
-      },
+      metadata,
     };
 
     this.clients.set(clientId, client);
@@ -402,7 +410,7 @@ export class WebSocketManager {
 
   // Send message to all connected clients
   public broadcastToAll(message: WebSocketMessage): void {
-    this.clients.forEach((client, clientId) => {
+    this.clients.forEach((_, clientId) => {
       this.sendToClient(clientId, message);
     });
   }
@@ -514,7 +522,7 @@ export class WebSocketManager {
     }
 
     // Close all connections
-    this.clients.forEach((client, clientId) => {
+    this.clients.forEach((client) => {
       client.socket.close(1001, 'Server shutting down');
     });
 

@@ -10,9 +10,15 @@
   "scripts": {
     "build": "tsc",
     "postinstall": "node ./scripts/postinstall.js",
-    "start": "node ./bin/cli.js start",
+    "start": "NODE_ENV=production node .monitoring/start-with-monitoring.js",
     "stop": "node ./bin/cli.js stop",
-    "status": "node ./bin/cli.js status"
+    "status": "node ./bin/cli.js status",
+    "dev": "node .monitoring/start-with-monitoring.js",
+    "dev:no-monitoring": "echo \"No original dev script found\"",
+    "monitoring:status": "cd monitoring-service/packages/app-monitor && node bin/cli.js status",
+    "monitoring:stop": "docker stop monitoring-timescaledb monitoring-redis 2>/dev/null || true",
+    "start:original": "node ./bin/cli.js start",
+    "start:no-monitoring": "node ./bin/cli.js start"
   },
   "dependencies": {
     "sqlite3": "^5.1.6",

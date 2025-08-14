@@ -80,6 +80,20 @@ export class AuthManager {
   async authenticateApiKey(key: string): Promise<ApiKey | null> {
     if (!key) return null;
 
+    // Check if this is the configured admin key
+    if (process.env.ADMIN_API_KEY && key === process.env.ADMIN_API_KEY) {
+      return {
+        id: 'admin-001',
+        name: 'Dashboard Admin',
+        key: key,
+        hash: 'admin',
+        permissions: ['read', 'write', 'admin'],
+        rateLimit: 10000,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
     try {
       // Try to get from cache first
       const cached = await this.getCachedApiKey(key);
@@ -223,7 +237,7 @@ export class AuthManager {
         ORDER BY created_at DESC
       `);
 
-      return result.rows.map(row => ({
+      return result.rows.map((row: any) => ({
         id: row.id,
         name: row.name,
         permissions: row.permissions,
@@ -240,7 +254,7 @@ export class AuthManager {
   }
 
   // Check if API key has required permission
-  hasPermission(apiKey: ApiKey, requiredPermission: string): boolean {
+  hasPermission(apiKey: ApiKey, requiredPermission: 'read' | 'write' | 'admin'): boolean {
     return apiKey.permissions.includes('admin') || 
            apiKey.permissions.includes(requiredPermission);
   }
@@ -368,7 +382,7 @@ export async function authenticateRequest(
 }
 
 // Middleware to check permissions
-export function requirePermission(permission: string) {
+export function requirePermission(permission: 'read' | 'write' | 'admin') {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!request.apiKey) {
       reply.code(401).send({

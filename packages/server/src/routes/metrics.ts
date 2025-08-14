@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getDatabase } from '../database';
 import { getRedis } from '../redis';
@@ -48,12 +48,24 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   const redis = getRedis();
 
   // Create single metric
-  fastify.post('/', {
+  fastify.post<{
+    Body: z.infer<typeof CreateMetricSchema.shape.body>;
+  }>('/', {
     schema: {
       description: 'Create a new metric',
       tags: ['metrics'],
       security: [{ apiKey: [] }],
-      body: CreateMetricSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          value: { type: 'number' },
+          unit: { type: 'string' },
+          dimensions: { type: 'object', additionalProperties: true },
+          source: { type: 'string' }
+        },
+        required: ['name', 'value', 'source']
+      },
       response: {
         201: {
           type: 'object',
@@ -72,7 +84,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { body } = CreateMetricSchema.parse(request);
       
@@ -129,7 +141,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error creating metric:', error);
+      request.log.error("Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -147,12 +159,34 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Create multiple metrics (bulk)
-  fastify.post('/bulk', {
+  fastify.post<{
+    Body: z.infer<typeof BulkCreateMetricsSchema.shape.body>;
+  }>('/bulk', {
     schema: {
       description: 'Create multiple metrics in bulk',
       tags: ['metrics'],
       security: [{ apiKey: [] }],
-      body: BulkCreateMetricsSchema.shape.body,
+      body: {
+        type: 'object',
+        properties: {
+          metrics: {
+            type: 'array',
+            maxItems: 1000,
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'number' },
+                unit: { type: 'string' },
+                dimensions: { type: 'object', additionalProperties: true },
+                source: { type: 'string' }
+              },
+              required: ['name', 'value', 'source']
+            }
+          }
+        },
+        required: ['metrics']
+      },
       response: {
         201: {
           type: 'object',
@@ -164,7 +198,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { body } = BulkCreateMetricsSchema.parse(request);
       
@@ -229,7 +263,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error creating bulk metrics:', error);
+      request.log.error("Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -247,12 +281,29 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Query metrics with aggregation
-  fastify.get('/', {
+  fastify.get<{
+    Querystring: z.infer<typeof QueryMetricsSchema.shape.query>;
+  }>('/', {
     schema: {
       description: 'Query metrics with filtering, aggregation, and time-based grouping',
       tags: ['metrics'],
       security: [{ apiKey: [] }],
-      querystring: QueryMetricsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          name: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          source: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          unit: { type: 'string' },
+          dimensions: { type: 'object', additionalProperties: true },
+          aggregation: { type: 'string', enum: ['avg', 'sum', 'min', 'max', 'count'], default: 'avg' },
+          groupBy: { type: 'array', items: { type: 'string' } },
+          interval: { type: 'string', enum: ['1m', '5m', '15m', '1h', '6h', '1d'], default: '5m' },
+          limit: { type: 'number', minimum: 1, maximum: 10000, default: 1000 },
+          offset: { type: 'number', minimum: 0, default: 0 }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -284,7 +335,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { query } = QueryMetricsSchema.parse(request);
 
@@ -387,7 +438,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error querying metrics:', error);
+      request.log.error("Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({
@@ -405,15 +456,20 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Get latest metric values
-  fastify.get('/latest', {
+  fastify.get<{
+    Querystring: { name?: string | string[]; source?: string | string[] };
+  }>('/latest', {
     schema: {
       description: 'Get latest values for metrics',
       tags: ['metrics'],
       security: [{ apiKey: [] }],
-      querystring: z.object({
-        name: z.array(z.string()).or(z.string()).optional(),
-        source: z.array(z.string()).or(z.string()).optional(),
-      }),
+      querystring: {
+        type: 'object',
+        properties: {
+          name: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          source: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -437,9 +493,9 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
-      const query = request.query as { name?: string | string[]; source?: string | string[] };
+      const query = request.query;
 
       // Build WHERE clause
       const conditions: string[] = [];
@@ -474,7 +530,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error getting latest metrics:', error);
+      request.log.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get latest metrics',
@@ -501,7 +557,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query(`
         SELECT DISTINCT name FROM metrics 
@@ -509,11 +565,11 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       `);
 
       reply.send({
-        names: result.rows.map(row => row.name),
+        names: result.rows.map((row: any) => row.name),
       });
 
     } catch (error) {
-      request.log.error('Error getting metric names:', error);
+      request.log.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get metric names',
@@ -540,7 +596,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query(`
         SELECT DISTINCT source FROM metrics 
@@ -548,11 +604,11 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       `);
 
       reply.send({
-        sources: result.rows.map(row => row.source),
+        sources: result.rows.map((row: any) => row.source),
       });
 
     } catch (error) {
-      request.log.error('Error getting metric sources:', error);
+      request.log.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get metric sources',
@@ -561,12 +617,23 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Get metric statistics
-  fastify.get('/stats', {
+  fastify.get<{
+    Querystring: z.infer<typeof MetricStatsSchema.shape.query>;
+  }>('/stats', {
     schema: {
       description: 'Get metric statistics',
       tags: ['metrics'],
       security: [{ apiKey: [] }],
-      querystring: MetricStatsSchema.shape.query,
+      querystring: {
+        type: 'object',
+        properties: {
+          startTime: { type: 'string', format: 'date-time' },
+          endTime: { type: 'string', format: 'date-time' },
+          name: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          source: { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+          groupBy: { type: 'string', enum: ['hour', 'day', 'week', 'month'], default: 'day' }
+        }
+      },
       response: {
         200: {
           type: 'object',
@@ -591,7 +658,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('read')],
-  }, async (request: FastifyRequest, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { query } = MetricStatsSchema.parse(request);
 
@@ -646,7 +713,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
         LIMIT 100
       `, params);
 
-      const stats = result.rows.map(row => ({
+      const stats = result.rows.map((row: any) => ({
         period: row.period,
         total_metrics: parseInt(row.total_metrics),
         unique_names: parseInt(row.unique_names),
@@ -659,7 +726,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       reply.send({ stats });
 
     } catch (error) {
-      request.log.error('Error getting metric statistics:', error);
+      request.log.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to get metric statistics',
@@ -668,7 +735,9 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Delete metric (admin only)
-  fastify.delete('/:id', {
+  fastify.delete<{
+    Params: { id: string };
+  }>('/:id', {
     schema: {
       description: 'Delete metric by ID (admin only)',
       tags: ['metrics'],
@@ -697,7 +766,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('admin')],
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const result = await db.query('DELETE FROM metrics WHERE id = $1', [request.params.id]);
 
@@ -714,7 +783,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error deleting metric:', error);
+      request.log.error("Error occurred");
       reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Failed to delete metric',
@@ -723,7 +792,10 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   });
 
   // Increment metric (convenient endpoint for counters)
-  fastify.post('/increment/:name', {
+  fastify.post<{
+    Params: { name: string };
+    Body: { value?: number; source: string; dimensions?: Record<string, string> };
+  }>('/increment/:name', {
     schema: {
       description: 'Increment a metric by a value',
       tags: ['metrics'],
@@ -755,10 +827,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       },
     },
     preHandler: [requirePermission('write')],
-  }, async (request: FastifyRequest<{
-    Params: { name: string };
-    Body: { value?: number; source: string; dimensions?: Record<string, string> };
-  }>, reply: FastifyReply) => {
+  }, async (request, reply) => {
     try {
       const { name } = request.params;
       const { value = 1, source, dimensions } = request.body;
@@ -804,7 +873,7 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       });
 
     } catch (error) {
-      request.log.error('Error incrementing metric:', error);
+      request.log.error("Error occurred");
       
       if (error instanceof z.ZodError) {
         reply.code(400).send({

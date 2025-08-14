@@ -33,8 +33,8 @@ function getEnvNumber(key: string, defaultValue: number): number {
 
 // Default configuration
 export const defaultConfig: DashboardConfig = {
-  apiUrl: getPublicEnvVar('MONITORING_API_URL', '/api') || '/api',
-  apiKey: getPublicEnvVar('MONITORING_API_KEY'),
+  apiUrl: getPublicEnvVar('MONITORING_API_URL', 'http://localhost:4001') || 'http://localhost:4001',
+  apiKey: getPublicEnvVar('MONITORING_API_KEY') || process.env.NEXT_PUBLIC_MONITORING_API_KEY,
   refreshInterval: getEnvNumber('REFRESH_INTERVAL', 5000),
   enableRealtime: getEnvBoolean('ENABLE_REALTIME', true),
   enableExport: getEnvBoolean('ENABLE_EXPORT', true),
@@ -99,7 +99,7 @@ export function getDataSourceConfigs(): DataSourceConfig[] {
       id: 'crowdtrainer',
       name: 'CrowdTrainer',
       type: 'crowdtrainer',
-      endpoint: getPublicEnvVar('MONITORING_API_URL', '/api') || '/api',
+      endpoint: getPublicEnvVar('MONITORING_API_URL', 'http://localhost:4001') || 'http://localhost:4001',
       apiKey: getPublicEnvVar('MONITORING_API_KEY'),
       enabled: true,
       priority: 1,
